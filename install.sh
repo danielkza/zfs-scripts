@@ -5,7 +5,7 @@ cd /root
 
 # Fix base repos
 
-sed -i /etc/apt/sources.list 's/main$/main contrib non-free/'
+sed -i 's/main$/main contrib non-free/' /etc/apt/sources.list
 
 cat > /etc/apt/sources.list.d/wheezy-backports.list <<'EOF'
 deb http://sft.if.usp.br/debian wheezy-backports main contrib non-free
@@ -41,9 +41,3 @@ else
 	echo 'ZFS module not running, check errors.'
 	exit 1
 fi
-
-
-
-
-
-
