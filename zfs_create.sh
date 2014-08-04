@@ -184,6 +184,9 @@ for ssd in "${ssds[@]}"; do
 
         cmd sleep 1
 
+        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part1"
+        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part2"
+
         cmd mkfs.vfat "/dev/disk/by-id/${ssd}-part1"
         cmd mkfs.ext2 -m 0 -L /boot -j "/dev/disk/by-id/${ssd}-part2"
     elif [ "$ssd" = "$swap_ssd" ]; then
@@ -194,6 +197,8 @@ for ssd in "${ssds[@]}"; do
           -t 1:"8200"
 
         cmd sleep 1
+
+        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part1"
 
         cmd mkswap "/dev/disk/by-id/${ssd}-part1"
     fi
@@ -208,6 +213,9 @@ for ssd in "${ssds[@]}"; do
         cmd $SGDISK_SSD --new=4:0:0 \
           -c:4:"ZFS L2ARC" \
           -t 4:"bf01"
+
+        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
+        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
     else
         echo "** Skipping partitioning, to be used as whole disk"
     fi
