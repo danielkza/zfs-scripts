@@ -157,6 +157,8 @@ fi
 
 echo "* Destroying existing pool"
 
+cmd zpool status "$pool_name" && cmd zpool destroy "$pool_name" 
+
 echo "* Formatting SSDs"
 
 SGDISK="sgdisk -a 2048"
@@ -167,6 +169,7 @@ for ssd in "${ssds[@]}"; do
     SGDISK_SSD="${SGDISK} '/dev/disk/by-id/${ssd}'"
 
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}"
+    cmd hdparm -z "/dev/disk/by-id/${ssd}"
     cmd $SGDISK_SSD --clear
 
     if [ "$ssd" = "$boot_ssd" ]; then
@@ -215,7 +218,9 @@ done
 echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
     echo "** Clearing ${hdd}"
+    
     cmd zpool labelclear -f "/dev/disk/by-id/${hdd}"
+    cmd hdparm -z "/dev/disk/by-id/${ssd}"
     cmd $SGDISK "/dev/disk/by-id/${hdd}" --clear
 done
 
