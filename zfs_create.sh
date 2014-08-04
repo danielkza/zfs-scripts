@@ -277,4 +277,4 @@ cmd zfs create "${pool_name}/root/debian" -o mountpoint=/
 
 echo "* Setting options"
 
-cmd zpool set "$pool_name" bootfs="${pool_name}/root/debian"
+cmd zpool set bootfs="${pool_name}/root/debian" "$pool_name"
