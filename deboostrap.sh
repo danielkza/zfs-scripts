@@ -8,10 +8,10 @@ boot_part_uuid=$2
 efi_part_uuid=$3
 hostname=$4
 
-mkdir "${mount_path}/boot"
+mkdir -p "${mount_path}/boot"
 mount "UUID=$boot_part_uuid" "${mount_path}/boot"
 
-mkdir "${mount_path}/boot/efi"
+mkdir -p "${mount_path}/boot/efi"
 mount "UUID=$efi_part_uuid" "${mount_path}/boot/efi"
 
 debootstrap --arch=amd64 wheezy "$mount_path" "$mirror"

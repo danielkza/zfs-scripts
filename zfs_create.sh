@@ -10,7 +10,7 @@ declare -a ssds
 zlogsize='1024MiB'
 test_only=''
 pool_name=''
-mount_path='/mnt/rl_zfs_inst'
+mount_path='/mnt/rl-zfs-inst'
 
 print_help()
 {

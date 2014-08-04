@@ -17,22 +17,12 @@ EOF
 wget -N http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2%7Ewheezy_all.deb
 dpkg -i zfsonlinux_2~wheezy_all.deb
 
-cat > /etc/apt/sources.list.d/zfs-daily.list <<'EOF'
-deb http://archive.zfsonlinux.org/debian wheezy-daily main
-deb-src http://archive.zfsonlinux.org/debian wheezy-daily main
-EOF
-
-
-# ...
-
 apt-get update
 
 # Install base packages
 
 tasksel install standard ssh-server
 apt-get install locales nano vim
-
-
 
 # Install kernel packages
 
