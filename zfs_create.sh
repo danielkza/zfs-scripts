@@ -155,6 +155,8 @@ if [ $test_only -eq 0 ]; then
     fi
 fi
 
+echo "* Destroying existing pool"
+
 echo "* Formatting SSDs"
 
 SGDISK="sgdisk -a 2048"
@@ -164,7 +166,7 @@ for ssd in "${ssds[@]}"; do
 
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
-    cmd $SGDISK_SSD --clear
+    cmd $SGDISK_SSD --clear --zap-all
 
     if [ "$ssd" = "$boot_ssd" ]; then
         echo "** Creating boot partitions"
@@ -212,7 +214,7 @@ done
 echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
     echo "** Clearing $hdd"
-    cmd $SGDISK "/dev/disk/by-id/$hdd" --clear
+    cmd $SGDISK "/dev/disk/by-id/$hdd" --clear --zap-all
     hdparm -z "/dev/disk/by-id/$hdd"
 done
 
