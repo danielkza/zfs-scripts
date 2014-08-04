@@ -166,7 +166,7 @@ SGDISK="sgdisk -a 2048"
 for ssd in "${ssds[@]}"; do
     echo "** Formatting ${ssd}"
 
-    SGDISK_SSD="${SGDISK} '/dev/disk/by-id/${ssd}'"
+    SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}"
     cmd hdparm -z "/dev/disk/by-id/${ssd}"
