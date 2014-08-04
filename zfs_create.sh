@@ -215,7 +215,7 @@ for ssd in "${ssds[@]}"; do
           -t 4:"bf01"
 
         cmd sleep 1
-        
+
         cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
         cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
     else
@@ -270,7 +270,7 @@ echo "* Reimporting pool at $mount_path"
 
 cmd zpool export "$pool_name"
 ! [ -d "$mount_path" ] && cmd mkdir -p "$mount_path"
-cmd zpool import -d /dev/disk/by-id -R "$mount_path"
+cmd zpool import "$pool_name" -d /dev/disk/by-id -R "$mount_path"
 
 echo "* Creating filesystems"
 
