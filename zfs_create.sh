@@ -166,7 +166,7 @@ for ssd in "${ssds[@]}"; do
 
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
-    cmd $SGDISK_SSD --clear --zap-all
+    cmd zpool labelclear -f /dev/disk/by-id/${ssd}
 
     if [ "$ssd" = "$boot_ssd" ]; then
         echo "** Creating boot partitions"
@@ -178,7 +178,7 @@ for ssd in "${ssds[@]}"; do
           -c 2:"/boot" \
           -t 2:"8300"
 
-        sleep 1
+        cmd sleep 1
 
         cmd mkfs.vfat "/dev/disk/by-id/${ssd}-part1"
         cmd mkfs.ext2 -m 0 -L /boot -j "/dev/disk/by-id/${ssd}-part2"
@@ -189,7 +189,7 @@ for ssd in "${ssds[@]}"; do
           -c 1:"Linux Swap" \
           -t 1:"8200"
 
-        sleep 1
+        cmd sleep 1
 
         cmd mkswap "/dev/disk/by-id/${ssd}-part1"
     fi
@@ -214,8 +214,7 @@ done
 echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
     echo "** Clearing $hdd"
-    cmd $SGDISK "/dev/disk/by-id/$hdd" --clear --zap-all
-    hdparm -z "/dev/disk/by-id/$hdd"
+    cmd zpool labelclear -f "/dev/disk/by-id/$hdd"
 done
 
 echo "* Creating pool"
