@@ -26,6 +26,15 @@ cmd()
     fi
 }
 
+array_contains()
+{
+    local e
+    for e in "${@:2}"; do
+        [[ "$e" == "$1" ]] && return 0
+    done
+    return 1
+}
+
 while getopts "h:d:s:l:rp:m:" opt; do
     case $opt in
     h)
@@ -133,25 +142,22 @@ for ssd in "${slog_ssds[@]}"; do
 done
 
 echo 
-read -p "Is everything right? Type YES to proceeed: " -r
-if ! [ "$REPLY" == "YES" ]; then
-    exit 1
-fi
 
-read -p "Are you sure? Type IAMSURE to proceeed: " -r
-if ! [ "$REPLY" == "IAMSURE" ]; then
-    exit 1
+if [ $test_only -eq 0 ]; then
+    read -p "Is everything right? Type YES to proceeed: " -r
+    if ! [ "$REPLY" == "YES" ]; then
+        exit 1
+    fi
+
+    read -p "Are you sure? Type IAMSURE to proceeed: " -r
+    if ! [ "$REPLY" == "IAMSURE" ]; then
+        exit 1
+    fi
 fi
 
 echo "* Formatting SSDs"
 
 SGDISK="sgdisk -a 2048"
-
-array_contains() {
-  local e
-  for e in "${@:2}"; do [[ "$e" == "$1" ]] && return 0; done
-  return 1
-}
 
 for ssd in "${ssds[@]}"; do
     echo "** Formatting ${ssd}"
