@@ -23,16 +23,16 @@ apt-get update
 # Install base packages
 
 tasksel install standard ssh-server
-apt-get install locales nano vim
+apt-get install -y locales nano vim
 
 # Install kernel packages
 
-apt-get install firmware-linux-nonfree linux-headers-amd64 \
+apt-get install -y firmware-linux-nonfree linux-headers-amd64 \
  gdisk dosfstools e2fsprogs
 
-apt-get install -t wheezy-backports linux-{image,headers}-3.12-0.bpo.1-amd64 
+apt-get install -y -t wheezy-backports linux-{image,headers}-3.12-0.bpo.1-amd64 
   
-apt-get install debian-zfs
+apt-get install -y debian-zfs
 
 # Check ZFS
 

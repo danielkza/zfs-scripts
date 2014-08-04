@@ -2,19 +2,28 @@
 
 set -e
 
-DO=''
-
 hostname=''
 declare -a hdds
 declare -a ssds
 zlogsize='1024MiB'
-test_only=''
+test_only=1
 pool_name=''
 mount_path='/mnt/rl-zfs-inst'
 
 print_help()
 {
-    echo "Usage: $0 -h hostname -d (hdd-id ...) -s (ssd-id ...) [-l zlogsize] [-t]" 1>&2
+    echo "Usage: $0 -h hostname -d (hdd-id ...) -s (ssd-id ...) [-l zlogsize] [-r]" 1>&2
+}
+
+cmd()
+{
+    echo "$@"
+    if [ $test_only -eq 0 ]; then
+        "$@"
+        return $?
+    else
+        return 0
+    fi
 }
 
 while getopts "h:d:s:l:tp:m:" opt; do
@@ -37,8 +46,8 @@ while getopts "h:d:s:l:tp:m:" opt; do
     m)
         mount_path="$OPTARG"
     ;;
-    t)
-        test_only=1
+    r)
+        test_only=0
     ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
@@ -58,10 +67,6 @@ fi
 
 if [ -z "$pool_name" ]; then
     pool_name="$hostname"
-fi
-
-if [ -n "$test_only" ]; then
-    DO='echo '
 fi
 
 echo "Using hostname '$hostname'"
@@ -140,7 +145,7 @@ fi
 
 echo "* Formatting SSDs"
 
-SGDISK="$DO sgdisk -a 2048"
+SGDISK="sgdisk -a 2048"
 
 array_contains() {
   local e
@@ -153,42 +158,42 @@ for ssd in "${ssds[@]}"; do
 
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
-    $SGDISK_SSD --clear
+    cmd $SGDISK_SSD --clear
 
     if [ "$ssd" = "$boot_ssd" ]; then
         echo "** Creating boot partitions"
         
-        $SGDISK_SSD --new=1:1M:256M \
+        cmd $SGDISK_SSD --new=1:1M:256M \
           -c 1:"EFI System Partition" \
           -t 1:"ef00"
-        $SGDISK_SSD --new=2:0:512M \
+        cmd $SGDISK_SSD --new=2:0:512M \
           -c 2:"/boot" \
           -t 2:"8300"
 
         sleep 1
 
-        $DO mkfs.vfat "/dev/disk/by-id/${ssd}-part1"
-        $DO mkfs.ext2 -m 0 -L /boot -j "/dev/disk/by-id/${ssd}-part2"
+        cmd mkfs.vfat "/dev/disk/by-id/${ssd}-part1"
+        cmd mkfs.ext2 -m 0 -L /boot -j "/dev/disk/by-id/${ssd}-part2"
     elif [ "$ssd" = "$swap_ssd" ]; then
         echo "** Creating swap partitions"
         
-        $SGDISK_SSD --new=1:1M:512M \
+        cmd $SGDISK_SSD --new=1:1M:512M \
           -c 1:"Linux Swap" \
           -t 1:"8200"
 
         sleep 1
 
-        $DO mkswap "/dev/disk/by-id/${ssd}-part1"
+        cmd mkswap "/dev/disk/by-id/${ssd}-part1"
     fi
 
     if array_contains "$ssd" "${slog_ssds[@]}"; then
         echo "** Creating ZIL SLOG partition"
-        $SGDISK_SSD --new=3:0:"${zlogsize}" \
+        cmd $SGDISK_SSD --new=3:0:"${zlogsize}" \
           -c 3:"ZFS SLOG" \
           -t 3:"bf01"
 
         echo "** Creating L2ARC partition"
-        $SGDISK_SSD --new=4:0:0 \
+        cmd $SGDISK_SSD --new=4:0:0 \
           -c:4:"ZFS L2ARC" \
           -t 4:"bf01"
     else
@@ -207,7 +212,7 @@ for (( i = 0; i < ${#hdds[@]}; i+=2 )); do
     hdds_pool_spec="${hdds_pool_spec} mirror ${hdd0} ${hdd1}"
 done
 
-$DO zpool create -o ashift=12 "$pool_name" ${hdds_pool_spec}
+cmd zpool create -o ashift=12 "$pool_name" ${hdds_pool_spec}
 
 echo "* Adding SSDs to pool"
 
@@ -228,17 +233,17 @@ for ssd in "${ssds[@]}"; do
     fi
 done
 
-$DO zpool add "$pool_name" ${ssds_slog_spec} ${ssds_cache_spec}
+cmd zpool add "$pool_name" ${ssds_slog_spec} ${ssds_cache_spec}
 
 echo "* Creating filesystems"
 
-$DO zfs create "${pool_name}/root" -o mountpoint=none
-$DO zfs create "${pool_name}/root/debian" -o mountpoint=/
+cmd zfs create "${pool_name}/root" -o mountpoint=none
+cmd zfs create "${pool_name}/root/debian" -o mountpoint=/
 
 echo "* Setting options and unmounting"
 
-$DO zpool set bootfs="${pool_name}/root/debian"
-$DO zpool export "$pool_name"
+cmd zpool set bootfs="${pool_name}/root/debian"
+cmd zpool export "$pool_name"
 
-! [ -d "$mount_path" ] && mkdir -p "$mount_path"
-zpool import -d /dev/disk/by-id -R "$mount_path"
+! [ -d "$mount_path" ] && cmd mkdir -p "$mount_path"
+cmd zpool import -d /dev/disk/by-id -R "$mount_path"
