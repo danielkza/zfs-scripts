@@ -248,15 +248,17 @@ done
 
 cmd zpool add "$pool_name" ${ssds_slog_spec} ${ssds_cache_spec}
 
+echo "* Reimporting pool at $mount_path"
+
+cmd zpool export "$pool_name"
+! [ -d "$mount_path" ] && cmd mkdir -p "$mount_path"
+cmd zpool import -d /dev/disk/by-id -R "$mount_path"
+
 echo "* Creating filesystems"
 
 cmd zfs create "${pool_name}/root" -o mountpoint=none
 cmd zfs create "${pool_name}/root/debian" -o mountpoint=/
 
-echo "* Setting options and unmounting"
+echo "* Setting options"
 
 cmd zpool set bootfs="${pool_name}/root/debian"
-cmd zpool export "$pool_name"
-
-! [ -d "$mount_path" ] && cmd mkdir -p "$mount_path"
-cmd zpool import -d /dev/disk/by-id -R "$mount_path"
