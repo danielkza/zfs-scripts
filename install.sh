@@ -5,7 +5,8 @@ cd /root
 
 # Fix base repos
 
-sed -i 's/main$/main contrib non-free/' /etc/apt/sources.list
+sed -i -e 's/main$/main contrib non-free/' \
+       -e 's/http\.debian\.net/sft.if.usp.br/' /etc/apt/sources.list
 
 cat > /etc/apt/sources.list.d/wheezy-backports.list <<'EOF'
 deb http://sft.if.usp.br/debian wheezy-backports main contrib non-free
