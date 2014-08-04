@@ -207,7 +207,7 @@ echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
     echo "** Clearing $hdd"
     cmd $SGDISK "/dev/disk/by-id/$hdd" --clear
-fi
+done
 
 echo "* Creating pool"
 hdds_pool_spec=""
