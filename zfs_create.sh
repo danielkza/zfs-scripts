@@ -274,7 +274,7 @@ echo "* Reimporting pool at $mount_path"
 
 cmd zpool export "$pool_name"
 ! [ -d "$mount_path" ] && cmd mkdir -p "$mount_path"
-cmd zpool import "$pool_name" -d /dev/disk/by-id -R "$mount_path"
+cmd zpool import "$pool_name" -N -d /dev/disk/by-id -R "$mount_path"
 
 echo "* Creating filesystems"
 
