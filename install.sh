@@ -27,7 +27,7 @@ apt-get install -y locales nano vim
 
 # Install kernel packages
 
-apt-get install -y firmware-linux-nonfree linux-{image,headers}-amd64 \
+apt-get install -y linux-{image,headers}-amd64 firmware-linux-nonfree  \
  gdisk dosfstools e2fsprogs
 
 apt-get install -y -t wheezy-backports linux-{image,headers}-3.12-0.bpo.1-amd64 
