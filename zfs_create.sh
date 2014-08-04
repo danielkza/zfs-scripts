@@ -167,6 +167,7 @@ for ssd in "${ssds[@]}"; do
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
     cmd zpool labelclear -f /dev/disk/by-id/${ssd}
+    cmd $SGDISK_SSD --clear
 
     if [ "$ssd" = "$boot_ssd" ]; then
         echo "** Creating boot partitions"
@@ -215,6 +216,7 @@ echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
     echo "** Clearing $hdd"
     cmd zpool labelclear -f "/dev/disk/by-id/$hdd"
+    cmd $SGDISK "/dev/disk/by-id/$hdd" --clear
 done
 
 echo "* Creating pool"
