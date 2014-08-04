@@ -213,6 +213,7 @@ echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
     echo "** Clearing $hdd"
     cmd $SGDISK "/dev/disk/by-id/$hdd" --clear
+    hdparm -z "/dev/disk/by-id/$hdd"
 done
 
 echo "* Creating pool"
