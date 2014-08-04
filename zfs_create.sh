@@ -233,7 +233,7 @@ for (( i = 0; i < ${#slog_ssds[@]}; i+=2 )); do
     ssd0="${slog_ssds[$i]}"
     ssd1="${slog_ssds[$((i+1))]}"
 
-    ssds_slog_spec="${ssds_slog_spec} mirror ${ssd0} ${ssd1}"
+    ssds_slog_spec="${ssds_slog_spec} mirror ${ssd0}-part3 ${ssd1}-part3"
 done
 
 ssds_cache_spec="cache"
