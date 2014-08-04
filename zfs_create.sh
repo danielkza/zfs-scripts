@@ -26,7 +26,7 @@ cmd()
     fi
 }
 
-while getopts "h:d:s:l:tp:m:" opt; do
+while getopts "h:d:s:l:rp:m:" opt; do
     case $opt in
     h)
         hostname=$OPTARG
