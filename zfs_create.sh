@@ -17,7 +17,7 @@ print_help()
 
 cmd()
 {
-    echo "$@"
+    echo + "$@"
     if [ $test_only -eq 0 ]; then
         "$@"
         return $?
@@ -86,12 +86,12 @@ hostname ${hostname}
 hdd_count="${#hdds[@]}" 
 ssd_count="${#ssds[@]}"
 
-if (( $hdd_count < 2 )) || (( $hdd_count % 2 != 0 )); then
+if (( hdd_count < 2 )) || (( hdd_count % 2 != 0 )); then
     echo "Invalid HDD count ${hdd_count}: must be multiple of 2, non-zero"
     exit 1
 fi
 
-if (( $ssd_count < 2 )) || (( $ssd_count % 2 != 0 )); then
+if (( ssd_count < 2 )) || (( ssd_count % 2 != 0 )); then
     echo "Invalid SSD count ${ssd_count}: must be multiple of 2, non-zero"
     exit 1
 fi
@@ -164,9 +164,9 @@ SGDISK="sgdisk -a 2048"
 for ssd in "${ssds[@]}"; do
     echo "** Formatting ${ssd}"
 
-    SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
+    SGDISK_SSD="${SGDISK} '/dev/disk/by-id/${ssd}'"
 
-    cmd zpool labelclear -f /dev/disk/by-id/${ssd}
+    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}"
     cmd $SGDISK_SSD --clear
 
     if [ "$ssd" = "$boot_ssd" ]; then
@@ -214,9 +214,9 @@ done
 
 echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
-    echo "** Clearing $hdd"
-    cmd zpool labelclear -f "/dev/disk/by-id/$hdd"
-    cmd $SGDISK "/dev/disk/by-id/$hdd" --clear
+    echo "** Clearing ${hdd}"
+    cmd zpool labelclear -f "/dev/disk/by-id/${hdd}"
+    cmd $SGDISK "/dev/disk/by-id/${hdd}" --clear
 done
 
 echo "* Creating pool"
