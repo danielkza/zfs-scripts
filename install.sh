@@ -10,7 +10,7 @@ sed -i -e 's/main$/main contrib non-free/' \
 
 cat > /etc/apt/sources.list.d/wheezy-backports.list <<'EOF'
 deb http://sft.if.usp.br/debian wheezy-backports main contrib non-free
-deb-src http://sft.if.usp.br/debian.org/debian wheezy-backports main contrib non-free
+deb-src http://sft.if.usp.br/debian wheezy-backports main contrib non-free
 EOF
 
 # Add ZFS repo
