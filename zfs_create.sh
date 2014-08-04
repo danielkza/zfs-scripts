@@ -247,7 +247,7 @@ for (( i = 0; i < ${#hdds[@]}; i+=2 )); do
     hdds_pool_spec="${hdds_pool_spec} mirror ${hdd0} ${hdd1}"
 done
 
-cmd zpool create -o ashift=12 "$pool_name" ${hdds_pool_spec}
+cmd zpool create -m none -R "$mount_path" -o ashift=12 "$pool_name" ${hdds_pool_spec}
 
 echo "* Adding SSDs to pool"
 
