@@ -163,10 +163,10 @@ for ssd in "${ssds[@]}"; do
     if [ "$ssd" = "$boot_ssd" ]; then
         echo "** Creating boot partitions"
         
-        cmd $SGDISK_SSD --new=1:1M:256M \
+        cmd $SGDISK_SSD --new=1:1M:+255M \
           -c 1:"EFI System Partition" \
           -t 1:"ef00"
-        cmd $SGDISK_SSD --new=2:0:512M \
+        cmd $SGDISK_SSD --new=2:0:+256M \
           -c 2:"/boot" \
           -t 2:"8300"
 
@@ -177,7 +177,7 @@ for ssd in "${ssds[@]}"; do
     elif [ "$ssd" = "$swap_ssd" ]; then
         echo "** Creating swap partitions"
         
-        cmd $SGDISK_SSD --new=1:1M:512M \
+        cmd $SGDISK_SSD --new=1:1M:+511M \
           -c 1:"Linux Swap" \
           -t 1:"8200"
 
@@ -188,7 +188,7 @@ for ssd in "${ssds[@]}"; do
 
     if array_contains "$ssd" "${slog_ssds[@]}"; then
         echo "** Creating ZIL SLOG partition"
-        cmd $SGDISK_SSD --new=3:0:"${zlogsize}" \
+        cmd $SGDISK_SSD --new=3:0:+"${zlogsize}" \
           -c 3:"ZFS SLOG" \
           -t 3:"bf01"
 
@@ -202,6 +202,12 @@ for ssd in "${ssds[@]}"; do
 
     echo
 done
+
+echo "* Clearing HDDs"
+for hdd in "${hdds[@]}"; do
+    echo "** Clearing $hdd"
+    cmd $SGDISK "/dev/disk/by-id/$hdd" --clear
+fi
 
 echo "* Creating pool"
 hdds_pool_spec=""
