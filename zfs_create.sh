@@ -8,11 +8,11 @@ declare -a ssds
 zlogsize='1024MiB'
 test_only=1
 pool_name=''
-mount_path='/mnt/rl-zfs-inst'
+mount_path=''
 
 print_help()
 {
-    echo "Usage: $0 -h hostname -d (hdd-id ...) -s (ssd-id ...) [-l zlogsize] [-r]" 1>&2
+    echo "Usage: $0 -h hostname -d (hdd-id ...) -s (ssd-id ...) [-l zlogsize] [-m mount_path] [-r]" 1>&2
 }
 
 cmd()
@@ -76,6 +76,10 @@ fi
 
 if [ -z "$pool_name" ]; then
     pool_name="$hostname"
+fi
+
+if [ -z "$mount_path" ]; then
+    mount_path="/mnt/${pool_name}"
 fi
 
 echo "Using hostname '$hostname'"
