@@ -6,7 +6,7 @@ cd /root
 # Fix base repos
 
 sed -i -e 's/main$/main contrib non-free/' \
-       -e 's/http\.debian\.net/sft.if.usp.br/' /etc/apt/sources.list
+ -e 's/http\.debian\.net/sft.if.usp.br/' /etc/apt/sources.list
 
 cat > /etc/apt/sources.list.d/wheezy-backports.list <<'EOF'
 deb http://sft.if.usp.br/debian wheezy-backports main contrib non-free
@@ -28,9 +28,10 @@ apt-get install locales nano vim
 # Install kernel packages
 
 apt-get install firmware-linux-nonfree linux-headers-amd64 \
-  linux-{image,headers}-3.12-0.bpo.1-amd64 \
-  gdisk dosfstools e2fsprogs
+ gdisk dosfstools e2fsprogs
 
+apt-get install -t wheezy-backports linux-{image,headers}-3.12-0.bpo.1-amd64 
+  
 apt-get install debian-zfs
 
 # Check ZFS
