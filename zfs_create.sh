@@ -214,6 +214,8 @@ for ssd in "${ssds[@]}"; do
           -c:4:"ZFS L2ARC" \
           -t 4:"bf01"
 
+        cmd sleep 1
+        
         cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
         cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
     else
