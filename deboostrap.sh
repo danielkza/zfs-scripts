@@ -41,7 +41,7 @@ apt-get install -y debootstrap
 debootstrap --arch=amd64 wheezy "$target" "$mirror"
 
 echo "$hostname" > "${target}/etc/hostname"
-sed "s/debian/${hostname}" /etc/hosts > "${target}/etc/hosts"
+sed "s/debian/${hostname}/" /etc/hosts > "${target}/etc/hosts"
 
 cat > "${target}/etc/fstab" <<EOF
 UUID=${boot_uuid} /boot auto defaults 0 1
