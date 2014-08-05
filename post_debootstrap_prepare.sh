@@ -14,7 +14,7 @@ if [ -z "$target" ] || ! [ -d "$target" ]; then
     exit 1
 fi
 
-post_strap="${BASH_SOURCE[0]}/post_deboostrap.sh"
+post_strap="${BASH_SOURCE[0]}/post_debootstrap.sh"
 zfs_prereqs="${BASH_SOURCE[0]}/zfs_prerequisites.sh"
 
 if ! [ -f "$post_strap" ] || ! [ -f "$zfs_prereqs" ]; then
