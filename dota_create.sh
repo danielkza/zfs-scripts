@@ -1,6 +1,6 @@
 #!/bin/bash
 
-src_dir="$(dirname "{BASH_SOURCE[0]}")"
+src_dir=$(dirname "{BASH_SOURCE[0]}")
 "${src_dir}/zfs_create.sh" -h dota -l 1024M \
   -d wwn-0x6c81f660db7624001a82f0de0f68e96b \
   -d wwn-0x6c81f660db7624001a82f0f710de325c \

@@ -12,7 +12,6 @@ if [ -z "$target" ] || ! [ -d "$target" ]; then
     exit 1
 fi
 
-umount "${target}/sys"
-umount "${target}/proc"
-umount "${target}/dev/pts"
-umount "${target}/dev"
+for path in boot/efi boot sys proc dev/pts dev; do
+	umount "${target}/${path}"
+done

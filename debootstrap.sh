@@ -8,6 +8,8 @@ boot_uuid="$3"
 efi_uuid="$4"
 mirror="$5"
 
+[ -n "$LANG" ] || LANG='en_US.UTF-8'
+
 if [ $# -lt 4 ]; then
     echo "Usage: $0 target_path hostname boot_uuid efi_uuid [mirror]"
     exit 1
@@ -56,12 +58,19 @@ iface lo inet loopback
 auto eth0
 allow-hotplug eth0
 iface eth0 inet dhcp
-
+    
 auto eth1
 allow-hotplug eth1
 iface eth1 inet dhcp
 EOF
 
-echo 'LANG=en_US.UTF-8' > /etc/default/locale
+echo "LANG=${LANG}" > "${target}/etc/default/locale"
+
+sed_uncomment() {
+    local search="$1"; shift
+    sed -e "$search"'s/^# *//' "$@" 
+}
+
+sed_uncomment "/${LANG}/" -i /etc/locale.gen
 
 ln -s /proc/mounts "${target}/etc/mtab"

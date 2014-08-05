@@ -24,6 +24,8 @@ if ! [ -f "$post_strap" ] || ! [ -f "$zfs_prereqs" ]; then
 fi
 
 cp "$post_strap" "$zfs_prereqs" "${target}/root/"
+chmod +x "${target}"/root/*.sh
+
 mkdir -p "${target}"/{boot,boot/efi,dev,proc,sys} 
 
 mount --bind /dev "${target}/dev"
