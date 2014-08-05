@@ -33,7 +33,7 @@ if [ -z "$efi_uuid" ] || ! blkid -t UUID="$efi_uuid"; then
     exit 1
 fi
 
-[ -n "$mirror" ] || mirror='http://sft.if.usp.br/debian'
+[ -n "$mirror" ] || mirror='http://debian.c3sl.ufpr.br/debian'
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y debootstrap

@@ -16,6 +16,9 @@ if ! [ -x "$zfs_prereqs" ]; then
     exit 1
 fi
 
+mirror="$1"
+[ -n "$mirror" ] || mirror='http://debian.c3sl.ufpr.br/debian/'
+
 export LANG=en_US.UTF-8
 export DEBIAN_FRONTEND=noninteractive
 
@@ -27,7 +30,7 @@ locale-gen en_US.UTF-8
 # Fix base repos
 
 sed -i -e 's/main$/main contrib non-free/' \
- -e 's/http\.debian\.net/sft.if.usp.br/' /etc/apt/sources.list
+ -e "s#http://http\.debian\.net/debian#${mirror}#" /etc/apt/sources.list
 
 # Add backports
 cat > /etc/apt/sources.list.d/wheezy-backports.list <<'EOF'
