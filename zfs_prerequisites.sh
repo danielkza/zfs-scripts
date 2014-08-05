@@ -9,7 +9,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
 
-apt-get install -y linux-{image,headers}-amd64 firmware-linux-nonfree \
+apt-get install -y linux-{image,headers}-amd64 \
  gdisk dosfstools e2fsprogs
 
 apt-get install -y debian-zfs
