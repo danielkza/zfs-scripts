@@ -36,7 +36,13 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y locales
 
-locale-gen en_US.UTF-8
+sed_uncomment() {
+    local search="$1"; shift
+    sed -e "$search"'s/^# *//' "$@" 
+}
+
+sed_uncomment "/${LANG}/" -i /etc/locale.gen
+locale-gen
 
 # Fix base repos
 

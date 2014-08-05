@@ -66,11 +66,4 @@ EOF
 
 echo "LANG=${LANG}" > "${target}/etc/default/locale"
 
-sed_uncomment() {
-    local search="$1"; shift
-    sed -e "$search"'s/^# *//' "$@" 
-}
-
-sed_uncomment "/${LANG}/" -i /etc/locale.gen
-
 ln -s /proc/mounts "${target}/etc/mtab"
