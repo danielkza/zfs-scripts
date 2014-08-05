@@ -32,3 +32,10 @@ mount --bind /dev "${target}/dev"
 mount --bind /dev/pts "${target}/dev/pts"
 mount --bind /proc "${target}/proc"
 mount --bind /sys  "${target}/sys"
+
+cat > "${target}/usr/sbin/policy-rc.d" <<'EOF'
+#!/bin/sh
+exit 101
+EOF
+
+chmod +x "${target}/usr/sbin/policy-rc.d"

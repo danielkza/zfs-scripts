@@ -12,6 +12,8 @@ if [ -z "$target" ] || ! [ -d "$target" ]; then
     exit 1
 fi
 
+rm "${target}/usr/sbin/policy-rc.d"
+
 for path in boot/efi boot sys proc dev/pts dev; do
 	umount "${target}/${path}"
 done
