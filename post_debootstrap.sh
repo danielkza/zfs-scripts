@@ -9,8 +9,9 @@ mount /boot
 mkdir -p /boot/efi
 mount /boot/efi
 
-zfs_prereqs_scripts="${BASH_SOURCE[0]}/zfs_prerequisites.sh"
-if ! [ -x "$zfs_prereqs_script" ]; then
+src_dir="$(dirname "{BASH_SOURCE[0]}")"
+zfs_prereqs="${src_dir}/zfs_prerequisites.sh"
+if ! [ -x "$zfs_prereqs" ]; then
     echo "Missing prerequisites script"
     exit 1
 fi
@@ -39,7 +40,7 @@ apt-get update
 # Install kernel before ZFS so module is correctly built
 apt-get install -y -t wheezy-backports linux-{image,headers}-3.12-0.bpo.1-amd64 
 
-if ! "$zfs_prereqs_script"; then
+if ! "$zfs_prereqs"; then
     echo "ZFS prereqs failed"
     exit 1
 fi

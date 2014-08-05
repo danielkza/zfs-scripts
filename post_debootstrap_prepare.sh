@@ -14,8 +14,9 @@ if [ -z "$target" ] || ! [ -d "$target" ]; then
     exit 1
 fi
 
-post_strap="${BASH_SOURCE[0]}/post_debootstrap.sh"
-zfs_prereqs="${BASH_SOURCE[0]}/zfs_prerequisites.sh"
+src_dir="$(dirname "{BASH_SOURCE[0]}")"
+post_strap="${src_dir}/post_debootstrap.sh"
+zfs_prereqs="${src_dir}/zfs_prerequisites.sh"
 
 if ! [ -f "$post_strap" ] || ! [ -f "$zfs_prereqs" ]; then
     echo "Missing scripts"
