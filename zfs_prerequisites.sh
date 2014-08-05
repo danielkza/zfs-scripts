@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Add ZFS repo
 
 wget -N http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2%7Ewheezy_all.deb
