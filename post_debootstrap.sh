@@ -4,10 +4,10 @@ set -e
 cd /root
 
 mkdir -p /boot
-mount /boot
+(mount | grep -q '/boot ') || mount /boot
 
 mkdir -p /boot/efi
-mount /boot/efi
+(mount | grep -q '/boot/efi ') || mount /boot/efi
 
 src_dir=$(dirname "{BASH_SOURCE[0]}")
 zfs_prereqs="${src_dir}/zfs_prerequisites.sh"
@@ -68,7 +68,7 @@ fi
 # Install base packages
 
 tasksel install standard ssh-server
-apt-get install vim
+apt-get install -y vim
 
 # Install GRUB
 
@@ -114,3 +114,4 @@ if [ "$cmdline" != "$old_cmdline" ]; then
 fi
 
 grub-install --target=x86_64-efi --efi-directory=/boot/efi
+update-grub
