@@ -1,6 +1,6 @@
 #!/bin/bash
 
-"${BASH_SOURCe[0]}/zfs_create.sh" -h dota -l 1024M \
+"${BASH_SOURCE[0]}/zfs_create.sh" -h dota -l 1024M \
   -d wwn-0x6c81f660db7624001a82f0de0f68e96b \
   -d wwn-0x6c81f660db7624001a82f0f710de325c \
   -d wwn-0x6c81f660db7624001a82f10711d5e9a5 \
