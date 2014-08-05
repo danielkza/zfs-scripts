@@ -28,7 +28,7 @@ if [ -z "$boot_uuid" ] || ! blkid -t UUID="$boot_uuid"; then
     exit 1
 fi
 
-if [ -z "$efi_uuid" ]; || ! blkid -t UUID="$efi_uuid"; then
+if [ -z "$efi_uuid" ] || ! blkid -t UUID="$efi_uuid"; then
     echo "Invalid efi_uuid"
     exit 1
 fi
