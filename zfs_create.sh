@@ -350,14 +350,18 @@ dev_refs()
 }
 
 if (( ssd_count > 1 )); then
+    mdadm_copy_config=1
+
     echo; echo "* Creating MDADM devices"
 
     boot_dev=/dev/md/boot
-    cmd mdadm --create -f --verbose "$boot_dev" --level=mirror --raid-devices="${ssd_count}" \
+    yes | cmd mdadm --verbose --create "$boot_dev" --homehost="$hostname" \
+     --assume-clean --level=mirror -n="${ssd_count}" \
      $(dev_refs boot_uuids /dev/disk/by-partuuid/)
 
     swap_dev=/dev/md/swap
-    cmd mdadm --create -f --verbose "$swap_dev" --level=mirror --raid-devices="${ssd_count}" \
+    yes | cmd mdadm --verbose --create "$swap_dev" --homehost="$hostname" \
+     --assume-clean --level=mirror -n="${ssd_count}" \
      $(dev_refs swap_uuids /dev/disk/by-partuuid/)
 else
     boot_dev="/dev/disk/by-partuuid/${boot_uuids[0]}"
@@ -412,3 +416,8 @@ echo; echo "* Setting ZFS pool options"
 
 cmd zpool set bootfs="${pool_name}/root/debian" "$pool_name"
 cmd zpool set cachefile="${mount_path}/etc/zfs/zpool.cache" "$pool_name"
+
+if (( mdadm_copy_config )); then
+    echo; echo "* Copying MDADM configuration to target"
+    mdadm --examine --scan > "${mount_path}/etc/mdadm.conf"
+fi
