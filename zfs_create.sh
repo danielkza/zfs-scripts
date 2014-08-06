@@ -217,22 +217,25 @@ if (( test_only == 0 )); then
     fi
 fi
 
-echo "* Destroying existing pool"
-
 if (( test_only == 0 )) && zpool status "$pool_name"; then
     if ! confirm "A zpool named ${pool_name} already exists. Destroy it and proceed? [y/n]"; then
         exit 1
     fi
+
+    echo; echo; echo "* Destroying existing pool"
     cmd zpool destroy "$pool_name" 
 fi
 
-echo "* Formatting SSDs"
+echo; echo; echo "* Formatting SSDs"
 
 SGDISK="sgdisk -a 2048"
 efi_created=0
 
+slog_uuids=()
+l2arc_uuids=()
+
 for ssd in "${ssds[@]}"; do
-    echo "** Formatting ${ssd}"
+    echo; echo; echo "** Formatting ${ssd}"
 
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
@@ -241,7 +244,7 @@ for ssd in "${ssds[@]}"; do
     cmd $SGDISK_SSD --clear
 
     if (( efi_created == 0 )); then
-        echo "** Creating EFI partition"
+        echo; echo; echo "** Creating EFI partition"
             
         cmd $SGDISK_SSD --new="1:0:+${efi_size}" \
           -c 1:"EFI System Partition" \
@@ -252,35 +255,46 @@ for ssd in "${ssds[@]}"; do
         efi_created=1
         boot_start=0
     else
-        echo "** Skipping size of EFI partition in secondary disk"
+        echo; echo "** Skipping size of EFI partition in secondary disk"
+    
         boot_start="$efi_size"
     fi
 
-    echo "** Creating boot partition"
+    echo; echo "** Creating boot partition"
+    
     cmd $SGDISK_SSD --new="2:${boot_start}:+${boot_size}" \
      -c 2:"/boot" \
      -t 2:"8300"
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part2"
 
-    echo "** Creating swap partition"
+    echo; echo "** Creating swap partition"
+    
     cmd $SGDISK_SSD --new="3:0:+${swap_size}" \
-     -c 1:"Linux Swap" \
-     -t 1:"8200"
+     -c 3:"Linux Swap" \
+     -t 3:"8200"
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
 
-    echo "** Creating SLOG partition"
+    echo; echo "** Creating SLOG partition"
+    
+    slog_uuid=$(cat /proc/sys/kernel/random/uuid)
+    slog_uuids+="$slog_uuid"
+
     cmd $SGDISK_SSD --new="4:0:+${slog_size}" \
-     -c 3:"ZFS SLOG" \
-     -t 3:"bf01"
+     -c 4:"ZFS SLOG" \
+     -t 4:"bf01"
+     -u 4:"$slog_uuid"
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
 
-    echo "** Creating L2ARC partition in remaining space"
-    cmd $SGDISK_SSD --new=5:0:0 \
-     -c:4:"ZFS L2ARC" \
-     -t 4:"bf01"
-    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part5"
+    echo; echo "** Creating L2ARC partition in remaining space"
 
-    echo
+    l2arc_uuid=$(cat /proc/sys/kernel/random/uuid)
+    l2arc_uuids+="$l2arc_uuid"
+
+    cmd $SGDISK_SSD --new=5:0:0 \
+     -c:5:"ZFS L2ARC" \
+     -t 5:"bf01"
+     -u 5:"$l2arc_uuid"
+    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part5"
 done
 
 dev_refs()
@@ -316,7 +330,8 @@ zfs_refs()
 }
 
 if (( ssd_count > 1 )); then
-    echo "* Creating MDADM devices"
+    echo; echo "* Creating MDADM devices"
+
     boot_dev=/dev/md/boot
     cmd mdadm --create --verbose "$boot_dev" --level=mirror --raid-devices="${ssd_count}" \
      $(dev_refs ssds 2)
@@ -329,41 +344,48 @@ else
     swap_dev="/dev/disk/by-id/${ssds[0]}-part3"
 fi
 
-echo "* Formatting SSD partitions"
+echo; echo "* Formatting EFI partition"
 
 efi_dev="/dev/disk/by-id/${ssds[0]}-part1"
 cmd mkfs.vfat -n "EFI System Partition" "$efi_dev"
 
+echo; echo "* Formatting boot partition"
+
 cmd mkfs.ext2 -L "/boot" "$boot_dev"
+
+echo; echo "* Formatting swap partition"
 
 cmd mkswap "$swap_dev"
 
-echo "* Clearing HDDs"
+echo; echo "* Clearing HDDs"
+
 for hdd in "${hdds[@]}"; do
-    echo "** Clearing ${hdd}"
+    echo; echo "** Clearing ${hdd}"
     
     cmd zpool labelclear -f "/dev/disk/by-id/${hdd}"
     cmd hdparm -z "/dev/disk/by-id/${ssd}"
     cmd $SGDISK "/dev/disk/by-id/${hdd}" --clear
 done
 
-echo "* Creating pool"
+echo; echo "* Creating pool"
+
 cmd zpool create -m none -R "$mount_path" -o ashift=12 "$pool_name" \
  $(zfs_refs hdds 0 1)
 
-echo "* Adding SLOG to pool"
+echo; echo "* Adding SLOG to pool"
 
 cmd zpool add "$pool_name" log $(zfs_refs ssds 4 1)
 
-echo "* Adding caches to pool"
+echo; echo "* Adding caches to pool"
 
 cmd zpool add "$pool_name" cache $(zfs_refs ssds 5 0)
 
-echo "* Creating ZFS filesystems"
+echo; echo "* Creating ZFS filesystems"
 
 cmd zfs create "${pool_name}/root" -o mountpoint=none
 cmd zfs create "${pool_name}/root/debian" -o mountpoint=/
 
-echo "* Setting options"
+echo; echo "* Setting ZFS pool options"
 
 cmd zpool set bootfs="${pool_name}/root/debian" "$pool_name"
+cmd zpool set cachefile="${mount_path}/etc/zfs/zpool.cache" "$pool_name"
