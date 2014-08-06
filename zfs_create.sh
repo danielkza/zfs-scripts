@@ -35,19 +35,18 @@ Options:
     -m mount-path
                       Where to mount the root FS created from the pool after
                       everything is done.
-    -l zlog-size      
-                      Size to use for the ZFS SLOG partitions. Will be mirrored
-                      on all provided SSDs. Defaults to ${slogsize} if not
-                      specified. Should usually be expresed as '{num}MiB'.
-    -w swap-size      
-                      Size to use for the swap partitions. Will be mirrored on
-                      all provided SSDs. Defaults to ${swap_size}.
-    -b boot-size
-                      Size to use for the boot partitions. Will be mirrored on
-                      all provided SSDs. Defaults to ${boot_size}.
     -e efi-size
-                      Size to use for the EFI partition on the first SSD.
-                      Defaults to ${efi_size}
+                      Size of the EFI partition on the first SSD.
+                      Defaults to ${efi_size}. Specify as '<num>MiB'.
+    -b boot-size
+                      Size of the boot partitions. Will be mirrored on
+                      all provided SSDs. Defaults to ${boot_size}.
+    -w swap-size      
+                      Size of the swap partitions. Will be mirrored on
+                      all provided SSDs. Defaults to ${swap_size}.
+    -l zlog-size      
+                      Size of the ZFS SLOG partitions. Will be mirrored
+                      on all provided SSDs. Defaults to ${slogsize}.
     -p pool-name
                       Use an specific pool name instead of defaulting to the
                       host name (without domain)
@@ -89,7 +88,7 @@ confirm()
     fi
 }
 
-while getopts "h:d:s:m:l:w:b:p:tT" opt; do
+while getopts "h:d:s:m:e:b:w:l:p:ty" opt; do
     case $opt in
     h)
         hostname=$OPTARG
