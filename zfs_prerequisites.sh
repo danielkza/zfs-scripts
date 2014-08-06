@@ -5,7 +5,10 @@ cd /root
 
 # Add ZFS repo
 
-wget -N http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2%7Ewheezy_all.deb
+mirror="$1"
+[ -n "$mirror" ] || mirror='http://debian.c3sl.ufpr.br/debian'
+
+wget -N 'http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2%7Ewheezy_all.deb'
 dpkg -i zfsonlinux_2~wheezy_all.deb
 
 # Add backports for udev
