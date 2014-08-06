@@ -10,4 +10,4 @@ src_dir=$(dirname "{BASH_SOURCE[0]}")
   -d wwn-0x6c81f660db7624001a82f12713c26bcc \
   -d wwn-0x6c81f660db7624001a82f13614a1c590 \
   -s wwn-0x6c81f660db7624001a82f16017237ae7 \
-  -s wwn-0x6c81f660db7624001a82f171182cc38b
+  -s wwn-0x6c81f660db7624001a82f171182cc38b "$@"
