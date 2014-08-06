@@ -285,8 +285,8 @@ done
 
 dev_refs()
 {
-    local devs=("${!1[@]}")
-    local part_num=$(( $2 ))
+    local var="${1}[@]"
+    local devs=("${!var}") part_num=$(( $2 ))
 
     for (( i = 0; i < ${#devs[@]}; ++i )); do
         if (( part_num )); then
@@ -299,9 +299,8 @@ dev_refs()
 
 zfs_refs()
 {
-    local devs=("${!1[@]}")
-    local part_num=$(( $2 ))
-    local mirror=$(( $3 != 0 ))
+    local var="${1}[@]"
+    local devs=("${!var}") part_num=$(( $2 )) mirror=$(( $3 != 0 ))
     
     for (( i = 0; i < ${#devs[@]}; ++i )); do
         if (( mirror && i % 2 == 0 )); then
