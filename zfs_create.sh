@@ -242,7 +242,7 @@ for ssd in "${ssds[@]}"; do
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}"
-    cmd hdparm -z "/dev/disk/by-id/${ssd}"
+    sleep 1
     cmd $SGDISK_SSD --clear
 
     part_num=1
@@ -374,7 +374,7 @@ for hdd in "${hdds[@]}"; do
     echo; echo "** Clearing ${hdd}"
     
     cmd zpool labelclear -f "/dev/disk/by-id/${hdd}"
-    cmd hdparm -z "/dev/disk/by-id/${ssd}"
+    sleep 1
     cmd $SGDISK "/dev/disk/by-id/${hdd}" --clear
 done
 
