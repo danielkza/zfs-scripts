@@ -231,8 +231,8 @@ echo; echo; echo "* Formatting SSDs"
 SGDISK="sgdisk -a 2048"
 efi_created=0
 
-slog_uuids=()
-l2arc_uuids=()
+declare -a slog_uuids
+declare -a l2arc_uuids
 
 for ssd in "${ssds[@]}"; do
     echo; echo; echo "** Formatting ${ssd}"
@@ -274,10 +274,10 @@ for ssd in "${ssds[@]}"; do
      -t 3:"8200"
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
 
-    echo; echo "** Creating SLOG partition"
-    
     slog_uuid=$(cat /proc/sys/kernel/random/uuid)
     slog_uuids+="$slog_uuid"
+
+    echo; echo "** Creating SLOG partition (${slog_uuid})"
 
     cmd $SGDISK_SSD --new="4:0:+${slog_size}" \
      -c 4:"ZFS SLOG" \
@@ -285,10 +285,10 @@ for ssd in "${ssds[@]}"; do
      -u 4:"$slog_uuid"
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
 
-    echo; echo "** Creating L2ARC partition in remaining space"
-
     l2arc_uuid=$(cat /proc/sys/kernel/random/uuid)
     l2arc_uuids+="$l2arc_uuid"
+
+    echo; echo "** Creating L2ARC partition in rem. space (${l2arc_uuid})"
 
     cmd $SGDISK_SSD --new=5:0:0 \
      -c:5:"ZFS L2ARC" \
