@@ -245,60 +245,82 @@ for ssd in "${ssds[@]}"; do
     cmd hdparm -z "/dev/disk/by-id/${ssd}"
     cmd $SGDISK_SSD --clear
 
+    part_num=1
+
     if [ -z "$efi_uuid" ]; then
+        # EFI
+
         efi_uuid=$(rand_uuid)
+    
         echo; echo "** Creating EFI partition (${efi_uuid})"
             
-        cmd $SGDISK_SSD --new="0:0:+${efi_size}" \
-          -c "0:EFI" \
-          -t 0:ef00 \
-          -u "0:${efi_uuid}"
+        cmd $SGDISK_SSD --new="${part_num}:0:+${efi_size}" \
+          -c "${part_num}:EFI" \
+          -t "${part_num}:ef00" \
+          -u "${part_num}:${efi_uuid}"
+        (( ++part_num ))
 
         cmd zpool labelclear -f "/dev/disk/by-partuuid/${efi_uuid}"
     fi
+
+    # Boot
 
     boot_uuid=$(rand_uuid)
     boot_uuids+=("$boot_uuid")
 
     echo; echo "** Creating boot partition (${boot_uuid})"
     
-    cmd $SGDISK_SSD --new="0:0:+${boot_size}" \
-     -c 0:/boot \
-     -t 0:8300 \
-     -u "0:${boot_uuid}"
+    cmd $SGDISK_SSD --new="${part_num}:0:+${boot_size}" \
+     -c "${part_num}:/boot" \
+     -t "${part_num}:8300" \
+     -u "${part_num}:${boot_uuid}"
+    (( ++part_num ))
+
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${boot_uuid}"
 
+    # Swap
+    
     swap_uuid=$(rand_uuid)
     swap_uuids+=("$swap_uuid")
 
     echo; echo "** Creating swap partition (${swap_uuid})"
     
-    cmd $SGDISK_SSD --new="0:0:+${swap_size}" \
-     -c "0:Linux Swap" \
-     -t 0:8200 \
-     -u "0:${swap_uuid}"
+    cmd $SGDISK_SSD --new="${part_num}:0:+${swap_size}" \
+     -c "${part_num}:Linux Swap" \
+     -t "${part_num}:8200" \
+     -u "${part_num}:${swap_uuid}"
+    (( ++part_num ))
+
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${swap_uuid}"
+
+    # SLOG
 
     slog_uuid=$(rand_uuid)
     slog_uuids+=("$slog_uuid")
 
     echo; echo "** Creating SLOG partition (${slog_uuid})"
 
-    cmd $SGDISK_SSD --new="0:0:+${slog_size}" \
-     -c "0:ZFS SLOG" \
-     -t 0:bf01 \
-     -u "0:${slog_uuid}"
+    cmd $SGDISK_SSD --new="${part_num}:0:+${slog_size}" \
+     -c "${part_num}:ZFS SLOG" \
+     -t "${part_num}:bf01" \
+     -u "${part_num}:${slog_uuid}"
+    (( ++part_num ))
+
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${slog_uuid}"
+    
+    # L2ARC
 
     l2arc_uuid=$(rand_uuid)
     l2arc_uuids+=("$l2arc_uuid")
 
     echo; echo "** Creating L2ARC partition in rem. space (${l2arc_uuid})"
 
-    cmd $SGDISK_SSD --largest-new=0 \
-     -c:"0:ZFS L2ARC" \
-     -t 0:bf01 \
-     -u "0:${l2arc_uuid}"
+    cmd $SGDISK_SSD --largest-new="${part_num}" \
+     -c:"${part_num}:ZFS L2ARC" \
+     -t "${part_num}:bf01" \
+     -u "${part_num}:${l2arc_uuid}"
+    (( ++part_num ))
+
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${l2arc_uuid}"
 done
 
