@@ -264,7 +264,8 @@ for ssd in "${ssds[@]}"; do
     
     cmd $SGDISK_SSD --new="0:0:+${boot_size}" \
      -c 0:/boot \
-     -t 0:8300
+     -t 0:8300 \
+     -u "0:${boot_uuid}"
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${boot_uuid}"
 
     swap_uuid=$(rand_uuid)
@@ -274,7 +275,8 @@ for ssd in "${ssds[@]}"; do
     
     cmd $SGDISK_SSD --new="0:0:+${swap_size}" \
      -c "0:Linux Swap" \
-     -t 0:8200
+     -t 0:8200 \
+     -u "0:${swap_uuid}"
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${swap_uuid}"
 
     slog_uuid=$(rand_uuid)
