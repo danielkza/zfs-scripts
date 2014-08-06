@@ -196,9 +196,6 @@ echo
 echo "Using ${ssd_count} SSDs: "
 declare -A ssd_devs
 check_disks "ssd_devs" "${ssds[@]}"
-echo
-
-echo 
 
 if (( ssd_count == 1 )); then
     echo "Only one SSD selected. Your boot, swap and SLOG will not be mirrored."
@@ -222,11 +219,11 @@ if (( test_only == 0 )) && zpool status "$pool_name"; then
         exit 1
     fi
 
-    echo; echo; echo "* Destroying existing pool"
+    echo; echo "* Destroying existing pool"
     cmd zpool destroy "$pool_name" 
 fi
 
-echo; echo; echo "* Formatting SSDs"
+echo; echo "* Formatting SSDs"
 
 SGDISK="sgdisk -a 2048"
 efi_created=0
@@ -235,7 +232,7 @@ declare -a slog_uuids
 declare -a l2arc_uuids
 
 for ssd in "${ssds[@]}"; do
-    echo; echo; echo "** Formatting ${ssd}"
+    echo; echo "** Formatting ${ssd}"
 
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
@@ -244,7 +241,7 @@ for ssd in "${ssds[@]}"; do
     cmd $SGDISK_SSD --clear
 
     if (( efi_created == 0 )); then
-        echo; echo; echo "** Creating EFI partition"
+        echo; echo "** Creating EFI partition"
             
         cmd $SGDISK_SSD --new="1:0:+${efi_size}" \
           -c 1:"EFI System Partition" \

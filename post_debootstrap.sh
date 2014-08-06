@@ -51,16 +51,18 @@ locale-gen
 sed -i -e 's/main$/main contrib non-free/' \
  -e "s#http://http\.debian\.net/debian#${mirror}#" /etc/apt/sources.list
 
-# Add backports
-cat > /etc/apt/sources.list.d/wheezy-backports.list <<EOF
+# Add backports if needed
+if ! [ -f /etc/apt/sources.list.d/wheezy-backports.list ]; then
+    cat > /etc/apt/sources.list.d/wheezy-backports.list <<EOF
 deb ${mirror} wheezy-backports main contrib non-free
 deb-src ${mirror} wheezy-backports main contrib non-free
 EOF
+fi
 
 apt-get update
 
 # Install kernel before ZFS so module is correctly built
-apt-get install -y -t wheezy-backports linux-{image,headers}-3.12-0.bpo.1-amd64 
+apt-get install -y linux-{image,headers}-3.12-0.bpo.1-amd64/wheezy-backports
 
 if ! "$zfs_prereqs"; then
     echo "ZFS prereqs failed"
