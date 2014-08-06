@@ -40,7 +40,8 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y debootstrap
 
-debootstrap --arch=amd64 wheezy "$target" "$mirror"
+debootstrap --arch=amd64 wheezy "$target" "$mirror" \
+ --include=ifupdown,netbase,net-tools,iproute,openssh-server
 
 echo "$hostname" > "${target}/etc/hostname"
 sed "s/debian/${hostname}/" /etc/hosts > "${target}/etc/hosts"
