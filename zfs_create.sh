@@ -414,10 +414,12 @@ cmd zfs create "${pool_name}/root/debian" -o mountpoint=/
 
 echo; echo "* Setting ZFS pool options"
 
+cmd mkdir -p "${mount_path}/etc/zfs"
+
 cmd zpool set bootfs="${pool_name}/root/debian" "$pool_name"
 cmd zpool set cachefile="${mount_path}/etc/zfs/zpool.cache" "$pool_name"
 
 if (( mdadm_copy_config )); then
     echo; echo "* Copying MDADM configuration to target"
-    mdadm --examine --scan > "${mount_path}/etc/mdadm.conf"
+    cmd mdadm --examine --scan > "${mount_path}/etc/mdadm.conf"
 fi
