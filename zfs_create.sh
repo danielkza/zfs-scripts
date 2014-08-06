@@ -5,10 +5,10 @@ set -e
 hostname=''
 declare -a hdds
 declare -a ssds
-zlog_hsize='1024MiB'
-swap_size='1024MiB'
-boot_size='256MiB'
-efi_size='256MiB'
+zlog_hsize='1024M'
+swap_size='1024M'
+boot_size='256M'
+efi_size='256M'
 test_only=1
 non_interactive=0
 pool_name=''
@@ -37,7 +37,8 @@ Options:
                       everything is done.
     -e efi-size
                       Size of the EFI partition on the first SSD.
-                      Defaults to ${efi_size}. Specify as '<num>MiB'.
+                      Defaults to ${efi_size}. Should be specified in units of
+                      'M' for MiB.
     -b boot-size
                       Size of the boot partitions. Will be mirrored on
                       all provided SSDs. Defaults to ${boot_size}.
@@ -86,6 +87,11 @@ confirm()
 
         return 1
     fi
+}
+
+rand_uuid()
+{
+    cat /proc/sys/kernel/random/uuid
 }
 
 while getopts "h:d:s:m:e:b:w:l:p:ty" opt; do
@@ -226,10 +232,9 @@ fi
 echo; echo "* Formatting SSDs"
 
 SGDISK="sgdisk -a 2048"
-efi_created=0
 
-declare -a slog_uuids
-declare -a l2arc_uuids
+efi_uuid=''
+declare -a boot_uuids swap_uuids slog_uuids l2arc_uuids
 
 for ssd in "${ssds[@]}"; do
     echo; echo "** Formatting ${ssd}"
@@ -240,76 +245,67 @@ for ssd in "${ssds[@]}"; do
     cmd hdparm -z "/dev/disk/by-id/${ssd}"
     cmd $SGDISK_SSD --clear
 
-    if (( efi_created == 0 )); then
-        echo; echo "** Creating EFI partition"
+    if [ -z "$efi_uuid" ]; then
+        efi_uuid=$(rand_uuid)
+        echo; echo "** Creating EFI partition (${efi_uuid})"
             
-        cmd $SGDISK_SSD --new="1:0:+${efi_size}" \
-          -c 1:"EFI System Partition" \
-          -t 1:"ef00"
+        cmd $SGDISK_SSD --new="0:0:+${efi_size}" \
+          -c "0:EFI System Partition" \
+          -t 0:ef00 \
+          -u "0:${efi_uuid}"
 
-        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part1"
-
-        efi_created=1
-        boot_start=0
-    else
-        boot_start="$efi_size"
+        cmd zpool labelclear -f "/dev/disk/by-partuuid/${efi_uuid}"
     fi
 
-    echo; echo "** Creating boot partition"
-    
-    cmd $SGDISK_SSD --new="2:${boot_start}:+${boot_size}" \
-     -c 2:"/boot" \
-     -t 2:"8300"
-    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part2"
+    boot_uuid=$(rand_uuid)
+    boot_uuids+="$boot_uuid"
 
-    echo; echo "** Creating swap partition"
+    echo; echo "** Creating boot partition (${boot_uuid})"
     
-    cmd $SGDISK_SSD --new="3:0:+${swap_size}" \
-     -c 3:"Linux Swap" \
-     -t 3:"8200"
-    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
+    cmd $SGDISK_SSD --new="0:0:+${boot_size}" \
+     -c 0:/boot \
+     -t 0:8300
+    cmd zpool labelclear -f "/dev/disk/by-partuuid/${boot_uuid}"
 
-    slog_uuid=$(cat /proc/sys/kernel/random/uuid)
+    swap_uuid=$(rand_uuid)
+    swap_uuids+="$swap_uuid"
+
+    echo; echo "** Creating swap partition (${swap_uuid})"
+    
+    cmd $SGDISK_SSD --new="0:0:+${swap_size}" \
+     -c "0:Linux Swap" \
+     -t 0:8200
+    cmd zpool labelclear -f "/dev/disk/by-partuuid/${swap_uuid}"
+
+    slog_uuid=$(rand_uuid)
     slog_uuids+="$slog_uuid"
 
     echo; echo "** Creating SLOG partition (${slog_uuid})"
 
-    cmd $SGDISK_SSD --new="4:0:+${slog_size}" \
-     -c 4:"ZFS SLOG" \
-     -t 4:"bf01" \
-     -u 4:"$slog_uuid"
-    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
+    cmd $SGDISK_SSD --new="0:0:+${slog_size}" \
+     -c "0:ZFS SLOG" \
+     -t 0:bf01 \
+     -u "0:${slog_uuid}"
+    cmd zpool labelclear -f "/dev/disk/by-partuuid/${slog_uuid}"
 
-    l2arc_uuid=$(cat /proc/sys/kernel/random/uuid)
+    l2arc_uuid=$(rand_uuid)
     l2arc_uuids+="$l2arc_uuid"
 
     echo; echo "** Creating L2ARC partition in rem. space (${l2arc_uuid})"
 
-    cmd $SGDISK_SSD --new=5:0:0 \
-     -c:5:"ZFS L2ARC" \
-     -t 5:"bf01" \
-     -u 5:"$l2arc_uuid"
-    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part5"
+    cmd $SGDISK_SSD --largest-new=0 \
+     -c:"0:ZFS L2ARC" \
+     -t 0:bf01 \
+     -u "0:${l2arc_uuid}"
+    cmd zpool labelclear -f "/dev/disk/by-partuuid/${l2arc_uuid}"
 done
 
 dev_refs()
 {
     local var="${1}[@]"
-    local devs=("${!var}") part_num=$(( $2 ))
+    local devs=("${!var}") prefix="$2" mirror
+    [ "$3" != "mirror" ] || mirror=1
 
-    for (( i = 0; i < ${#devs[@]}; ++i )); do
-        if (( part_num )); then
-            echo -n "${devs[i]}-part${part_num} "
-        else
-            echo -n "${devs[i]} "
-        fi  
-    done
-}
-
-zfs_refs()
-{
-    local var="${1}[@]"
-    local devs=("${!var}") mirror=$(( $2 != 0 ))
     
     for (( i = 0; i < ${#devs[@]}; ++i )); do
         if (( mirror && i % 2 == 0 )); then
@@ -325,19 +321,19 @@ if (( ssd_count > 1 )); then
 
     boot_dev=/dev/md/boot
     cmd mdadm --create --verbose "$boot_dev" --level=mirror --raid-devices="${ssd_count}" \
-     $(dev_refs ssds 2)
+     $(dev_refs boot_uuids /dev/disk/by-partuuid/)
 
     swap_dev=/dev/md/swap
     cmd mdadm --create --verbose "$swap_dev" --level=mirror --raid-devices="${ssd_count}" \
-     $(dev_refs ssds 3)
+     $(dev_refs swap_uuids /dev/disk/by-partuuid/)
 else
-    boot_dev="/dev/disk/by-id/${ssds[0]}-part2"
-    swap_dev="/dev/disk/by-id/${ssds[0]}-part3"
+    boot_dev="/dev/disk/by-partuuid/${boot_uuids[0]}"
+    swap_dev="/dev/disk/by-partuuid/${swap_uuids[0]}"
 fi
 
 echo; echo "* Formatting EFI partition"
 
-efi_dev="/dev/disk/by-id/${ssds[0]}-part1"
+efi_dev="/dev/disk/by-partuuid/${efi_uuid}"
 cmd mkfs.vfat -n "EFI System Partition" "$efi_dev"
 
 echo; echo "* Formatting boot partition"
@@ -361,15 +357,17 @@ done
 echo; echo "* Creating pool"
 
 cmd zpool create -m none -R "$mount_path" -o ashift=12 "$pool_name" \
- $(zfs_refs hdds 1)
+ $(dev_refs hdds /dev/disk/by-id/ mirror)
 
 echo; echo "* Adding SLOG to pool"
 
-cmd zpool add "$pool_name" log $(zfs_refs slog_uuids 1)
+cmd zpool add "$pool_name" log \
+ $(dev_refs slog_uuids /dev/disk/by-partuuid/ mirror)
 
 echo; echo "* Adding caches to pool"
 
-cmd zpool add "$pool_name" cache $(zfs_refs l2arc_uuids 0)
+cmd zpool add "$pool_name" cache \
+ $(dev_refs l2arc_uuids /dev/disk/by-partuuid/)
 
 echo; echo "* Creating ZFS filesystems"
 
