@@ -262,9 +262,9 @@ done
 ssds_cache_spec="cache"
 for ssd in "${ssds[@]}"; do
     if array_contains "$ssd" "${slog_ssds[@]}"; then
-        ssds_cache_spec="${ssds_cache_spec} /dev/disk/by-id/${ssd}-part4"
+        ssds_cache_spec="${ssds_cache_spec} ${ssd}-part4"
     else
-        ssds_cache_spec="${ssds_cache_spec} /dev/disk/by-id/${ssd}"
+        ssds_cache_spec="${ssds_cache_spec} ${ssd}"
     fi
 done
 
