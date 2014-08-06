@@ -258,7 +258,7 @@ for ssd in "${ssds[@]}"; do
     fi
 
     boot_uuid=$(rand_uuid)
-    boot_uuids+="$boot_uuid"
+    boot_uuids+=("$boot_uuid")
 
     echo; echo "** Creating boot partition (${boot_uuid})"
     
@@ -269,7 +269,7 @@ for ssd in "${ssds[@]}"; do
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${boot_uuid}"
 
     swap_uuid=$(rand_uuid)
-    swap_uuids+="$swap_uuid"
+    swap_uuids+=("$swap_uuid")
 
     echo; echo "** Creating swap partition (${swap_uuid})"
     
@@ -280,7 +280,7 @@ for ssd in "${ssds[@]}"; do
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${swap_uuid}"
 
     slog_uuid=$(rand_uuid)
-    slog_uuids+="$slog_uuid"
+    slog_uuids+=("$slog_uuid")
 
     echo; echo "** Creating SLOG partition (${slog_uuid})"
 
@@ -291,7 +291,7 @@ for ssd in "${ssds[@]}"; do
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${slog_uuid}"
 
     l2arc_uuid=$(rand_uuid)
-    l2arc_uuids+="$l2arc_uuid"
+    l2arc_uuids+=("$l2arc_uuid")
 
     echo; echo "** Creating L2ARC partition in rem. space (${l2arc_uuid})"
 
