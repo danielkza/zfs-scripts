@@ -3,12 +3,6 @@
 set -e
 cd /root
 
-mkdir -p /boot
-(mount | grep -q '/boot ') || mount /boot
-
-mkdir -p /boot/efi
-(mount | grep -q '/boot/efi ') || mount /boot/efi
-
 src_dir=$(dirname "{BASH_SOURCE[0]}")
 zfs_prereqs="${src_dir}/zfs_prerequisites.sh"
 if ! [ -x "$zfs_prereqs" ]; then
@@ -29,6 +23,14 @@ fi
 
 mirror="$2"
 [ -n "$mirror" ] || mirror='http://debian.c3sl.ufpr.br/debian'
+
+###
+
+mkdir -p /boot
+(mount | grep -q '/boot ') || mount /boot
+
+mkdir -p /boot/efi
+(mount | grep -q '/boot/efi ') || mount /boot/efi
 
 export LANG=en_US.UTF-8
 export DEBIAN_FRONTEND=noninteractive
