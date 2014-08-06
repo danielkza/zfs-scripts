@@ -26,6 +26,8 @@ apt-get update
 apt-get install -y linux-{image,headers}-amd64 \
  gdisk dosfstools e2fsprogs udev/wheezy-backports
 
+udevadm trigger
+
 apt-get install -y debian-zfs
 
 # Check ZFS

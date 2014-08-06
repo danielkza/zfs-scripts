@@ -252,8 +252,6 @@ for ssd in "${ssds[@]}"; do
         efi_created=1
         boot_start=0
     else
-        echo; echo "** Skipping size of EFI partition in secondary disk"
-    
         boot_start="$efi_size"
     fi
 
@@ -311,18 +309,14 @@ dev_refs()
 zfs_refs()
 {
     local var="${1}[@]"
-    local devs=("${!var}") part_num=$(( $2 )) mirror=$(( $3 != 0 ))
+    local devs=("${!var}") mirror=$(( $2 != 0 ))
     
     for (( i = 0; i < ${#devs[@]}; ++i )); do
         if (( mirror && i % 2 == 0 )); then
             echo -n "mirror "
         fi
         
-        if (( part_num )); then
-            echo -n "${devs[i]}-part${part_num} "
-        else
-            echo -n "${devs[i]} "
-        fi  
+        echo -n "${devs[i]} "  
     done
 }
 
@@ -367,15 +361,15 @@ done
 echo; echo "* Creating pool"
 
 cmd zpool create -m none -R "$mount_path" -o ashift=12 "$pool_name" \
- $(zfs_refs hdds 0 1)
+ $(zfs_refs hdds 1)
 
 echo; echo "* Adding SLOG to pool"
 
-cmd zpool add "$pool_name" log $(zfs_refs ssds 4 1)
+cmd zpool add "$pool_name" log $(zfs_refs slog_uuids 1)
 
 echo; echo "* Adding caches to pool"
 
-cmd zpool add "$pool_name" cache $(zfs_refs ssds 5 0)
+cmd zpool add "$pool_name" cache $(zfs_refs l2arc_uuids 0)
 
 echo; echo "* Creating ZFS filesystems"
 
