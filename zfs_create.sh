@@ -356,12 +356,12 @@ if (( ssd_count > 1 )); then
 
     boot_dev=/dev/md/boot
     yes | cmd mdadm --verbose --create "$boot_dev" --homehost="$hostname" \
-     --assume-clean --level=mirror -n="${ssd_count}" \
+     --assume-clean --level=mirror --raid-devices="${ssd_count}" \
      $(dev_refs boot_uuids /dev/disk/by-partuuid/)
 
     swap_dev=/dev/md/swap
     yes | cmd mdadm --verbose --create "$swap_dev" --homehost="$hostname" \
-     --assume-clean --level=mirror -n="${ssd_count}" \
+     --assume-clean --level=mirror --raid-devices="${ssd_count}" \
      $(dev_refs swap_uuids /dev/disk/by-partuuid/)
 else
     boot_dev="/dev/disk/by-partuuid/${boot_uuids[0]}"
