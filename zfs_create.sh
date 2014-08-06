@@ -281,7 +281,7 @@ for ssd in "${ssds[@]}"; do
 
     cmd $SGDISK_SSD --new="4:0:+${slog_size}" \
      -c 4:"ZFS SLOG" \
-     -t 4:"bf01"
+     -t 4:"bf01" \
      -u 4:"$slog_uuid"
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
 
@@ -292,7 +292,7 @@ for ssd in "${ssds[@]}"; do
 
     cmd $SGDISK_SSD --new=5:0:0 \
      -c:5:"ZFS L2ARC" \
-     -t 5:"bf01"
+     -t 5:"bf01" \
      -u 5:"$l2arc_uuid"
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part5"
 done
