@@ -312,7 +312,7 @@ dev_refs()
             echo -n "mirror "
         fi
         
-        echo -n "${devs[i]} "  
+        echo -n "${prefix}${devs[i]} "  
     done
 }
 
