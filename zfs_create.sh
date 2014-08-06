@@ -331,6 +331,8 @@ for ssd in "${ssds[@]}"; do
     refresh_disk "/dev/disk/by-id/${ssd}"
 done
 
+udevadm settle
+
 dev_refs()
 {
     local var="${1}[@]"
@@ -351,11 +353,11 @@ if (( ssd_count > 1 )); then
     echo; echo "* Creating MDADM devices"
 
     boot_dev=/dev/md/boot
-    cmd mdadm --create --verbose "$boot_dev" --level=mirror --raid-devices="${ssd_count}" \
+    cmd mdadm --create -f --verbose "$boot_dev" --level=mirror --raid-devices="${ssd_count}" \
      $(dev_refs boot_uuids /dev/disk/by-partuuid/)
 
     swap_dev=/dev/md/swap
-    cmd mdadm --create --verbose "$swap_dev" --level=mirror --raid-devices="${ssd_count}" \
+    cmd mdadm --create -f --verbose "$swap_dev" --level=mirror --raid-devices="${ssd_count}" \
      $(dev_refs swap_uuids /dev/disk/by-partuuid/)
 else
     boot_dev="/dev/disk/by-partuuid/${boot_uuids[0]}"
