@@ -6,7 +6,7 @@ hostname=''
 declare -a hdds
 declare -a ssds
 zlog_hsize='1024MiB'
-swap_size='512MiB'
+swap_size='1024MiB'
 boot_size='256MiB'
 efi_size='256MiB'
 test_only=1
@@ -69,15 +69,6 @@ cmd()
     else
         return 0
     fi
-}
-
-array_contains()
-{
-    local e
-    for e in "${@:2}"; do
-        [[ "$e" == "$1" ]] && return 0
-    done
-    return 1
 }
 
 confirm()
@@ -293,23 +284,48 @@ for ssd in "${ssds[@]}"; do
     echo
 done
 
-ssd_partition_refs()
+dev_refs()
 {
-    part_num="$1"
-    for ssd in "${ssds[@]}"; do
-        echo -n "/dev/disk/by-id/${ssd}-part${part_num} "
-    fi
+    local devs=("${!1[@]}")
+    local part_num=$(( $2 ))
+
+    for (( i = 0; i < ${#devs[@]}; ++i )); do
+        if (( part_num )); then
+            echo -n "${devs[i]}-part${part_num} "
+        else
+            echo -n "${devs[i]} "
+        fi  
+    done
+}
+
+zfs_refs()
+{
+    local devs=("${!1[@]}")
+    local part_num=$(( $2 ))
+    local mirror=$(( $3 != 0 ))
+    
+    for (( i = 0; i < ${#devs[@]}; ++i )); do
+        if (( mirror && i % 2 == 0 )); then
+            echo -n "mirror "
+        fi
+        
+        if (( part_num )); then
+            echo -n "${devs[i]}-part${part_num} "
+        else
+            echo -n "${devs[i]} "
+        fi  
+    done
 }
 
 if (( ssd_count > 1 )); then
     echo "* Creating MDADM devices"
     boot_dev=/dev/md/boot
     cmd mdadm --create --verbose "$boot_dev" --level=mirror --raid-devices="${ssd_count}" \
-     $(ssd_partitition_refs 2)
+     $(dev_refs ssds 2)
 
     swap_dev=/dev/md/swap
     cmd mdadm --create --verbose "$swap_dev" --level=mirror --raid-devices="${ssd_count}" \
-     $(ssd_partitition_refs 3)
+     $(dev_refs ssds 3)
 else
     boot_dev="/dev/disk/by-id/${ssds[0]}-part2"
     swap_dev="/dev/disk/by-id/${ssds[0]}-part3"
@@ -334,38 +350,18 @@ for hdd in "${hdds[@]}"; do
 done
 
 echo "* Creating pool"
-hdds_pool_spec=""
-for (( i = 0; i < ${#hdds[@]}; i+=2 )); do
-    hdd0="${hdds[$i]}"
-    hdd1="${hdds[$((i+1))]}"
+cmd zpool create -m none -R "$mount_path" -o ashift=12 "$pool_name" \
+ $(zfs_refs hdds 0 1)
 
-    hdds_pool_spec="${hdds_pool_spec} mirror ${hdd0} ${hdd1}"
-done
+echo "* Adding SLOG to pool"
 
-cmd zpool create -m none -R "$mount_path" -o ashift=12 "$pool_name" ${hdds_pool_spec}
+cmd zpool add "$pool_name" log $(zfs_refs ssds 4 1)
 
-echo "* Adding SSDs to pool"
+echo "* Adding caches to pool"
 
-ssds_slog_spec="log"
-for (( i = 0; i < ${#slog_ssds[@]}; i+=2 )); do
-    ssd0="${slog_ssds[$i]}"
-    ssd1="${slog_ssds[$((i+1))]}"
+cmd zpool add "$pool_name" cache $(zfs_refs ssds 5 0)
 
-    ssds_slog_spec="${ssds_slog_spec} mirror ${ssd0}-part3 ${ssd1}-part3"
-done
-
-ssds_cache_spec="cache"
-for ssd in "${ssds[@]}"; do
-    if array_contains "$ssd" "${slog_ssds[@]}"; then
-        ssds_cache_spec="${ssds_cache_spec} ${ssd}-part4"
-    else
-        ssds_cache_spec="${ssds_cache_spec} ${ssd}"
-    fi
-done
-
-cmd zpool add "$pool_name" ${ssds_slog_spec} ${ssds_cache_spec}
-
-echo "* Creating filesystems"
+echo "* Creating ZFS filesystems"
 
 cmd zfs create "${pool_name}/root" -o mountpoint=none
 cmd zfs create "${pool_name}/root/debian" -o mountpoint=/
