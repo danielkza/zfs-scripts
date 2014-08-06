@@ -252,9 +252,10 @@ for ssd in "${ssds[@]}"; do
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}"
-    sleep 1; refresh_disk "/dev/disk/by-id/${ssd}"
+    refresh_disk "/dev/disk/by-id/${ssd}"
 
     cmd $SGDISK_SSD --clear
+    refresh_disk "/dev/disk/by-id/${ssd}"
     
     part_num=1
 
@@ -272,6 +273,7 @@ for ssd in "${ssds[@]}"; do
         (( ++part_num ))
 
         cmd zpool labelclear -f "/dev/disk/by-partuuid/${efi_uuid}"
+        refresh_disk "/dev/disk/by-id/${ssd}"
     fi
 
     # Boot
@@ -287,8 +289,6 @@ for ssd in "${ssds[@]}"; do
      -u "${part_num}:${boot_uuid}"
     (( ++part_num ))
 
-    cmd zpool labelclear -f "/dev/disk/by-partuuid/${boot_uuid}"
-
     # Swap
     
     swap_uuid=$(rand_uuid)
@@ -302,8 +302,6 @@ for ssd in "${ssds[@]}"; do
      -u "${part_num}:${swap_uuid}"
     (( ++part_num ))
 
-    cmd zpool labelclear -f "/dev/disk/by-partuuid/${swap_uuid}"
-
     # SLOG
 
     slog_uuid=$(rand_uuid)
@@ -316,8 +314,6 @@ for ssd in "${ssds[@]}"; do
      -t "${part_num}:bf01" \
      -u "${part_num}:${slog_uuid}"
     (( ++part_num ))
-
-    cmd zpool labelclear -f "/dev/disk/by-partuuid/${slog_uuid}"
     
     # L2ARC
 
@@ -331,8 +327,6 @@ for ssd in "${ssds[@]}"; do
      -t "${part_num}:bf01" \
      -u "${part_num}:${l2arc_uuid}"
     (( ++part_num ))
-
-    cmd zpool labelclear -f "/dev/disk/by-partuuid/${l2arc_uuid}"
 
     refresh_disk "/dev/disk/by-id/${ssd}"
 done
