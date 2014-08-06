@@ -76,7 +76,7 @@ confirm()
     if (( yes == 1 )); then
         return 0
     else
-        read -p "$1" -r
+        read -p "$1 [y/n] " -r
         case "$REPLY" in
             [Yy])
                 return 0
@@ -205,23 +205,23 @@ check_disks "ssd_devs" "${ssds[@]}"
 
 if (( ssd_count == 1 )); then
     echo "Only one SSD selected. Your boot, swap and SLOG will not be mirrored."
-    if ! confirm "Disk failures will cause data and availability loss. Proceed? [y/n]"; then
+    if ! confirm "Disk failures will cause data and availability loss. Proceed?"; then
         exit 1
     fi
 fi
 
 if (( test_only == 0 )); then
-    if ! confirm "Verify all information for correctness. Proceed? [y/n]"; then
+    if ! confirm "Verify all information for correctness. Proceed?"; then
         exit 1
     fi
 
-    if ! confirm "Destructive actions will be performed. Are you sure? [y/n]"; then
+    if ! confirm "Destructive actions will be performed. Are you sure?"; then
         exit 1
     fi
 fi
 
-if (( test_only == 0 )) && zpool status "$pool_name"; then
-    if ! confirm "A zpool named ${pool_name} already exists. Destroy it and proceed? [y/n]"; then
+if (( test_only == 0 )) && zpool list -H -o name "$pool_name"; then
+    if ! confirm "A zpool named ${pool_name} already exists. Destroy it and proceed?"; then
         exit 1
     fi
 
@@ -250,7 +250,7 @@ for ssd in "${ssds[@]}"; do
         echo; echo "** Creating EFI partition (${efi_uuid})"
             
         cmd $SGDISK_SSD --new="0:0:+${efi_size}" \
-          -c "0:EFI System Partition" \
+          -c "0:EFI" \
           -t 0:ef00 \
           -u "0:${efi_uuid}"
 
