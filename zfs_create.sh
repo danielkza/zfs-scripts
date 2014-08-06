@@ -194,6 +194,16 @@ check_disks()
     done
 }
 
+refresh_disk()
+{
+    if (( test_only )); then
+        return 0
+    fi
+
+    sleep 1
+    cmd hdparm -z "$1"
+}
+
 echo "Using ${hdd_count} HDDs: "
 declare -A hdd_devs
 check_disks "hdd_devs" "${hdds[@]}"
@@ -242,9 +252,10 @@ for ssd in "${ssds[@]}"; do
     SGDISK_SSD="${SGDISK} /dev/disk/by-id/${ssd}"
 
     cmd zpool labelclear -f "/dev/disk/by-id/${ssd}"
-    cmd hdparm -z "/dev/disk/by-id/${ssd}"
-    cmd $SGDISK_SSD --clear
+    sleep 1; refresh_disk "/dev/disk/by-id/${ssd}"
 
+    cmd $SGDISK_SSD --clear
+    
     part_num=1
 
     if [ -z "$efi_uuid" ]; then
@@ -322,6 +333,8 @@ for ssd in "${ssds[@]}"; do
     (( ++part_num ))
 
     cmd zpool labelclear -f "/dev/disk/by-partuuid/${l2arc_uuid}"
+
+    refresh_disk "/dev/disk/by-id/${ssd}"
 done
 
 dev_refs()
@@ -374,7 +387,8 @@ for hdd in "${hdds[@]}"; do
     echo; echo "** Clearing ${hdd}"
     
     cmd zpool labelclear -f "/dev/disk/by-id/${hdd}"
-    cmd hdparm -z "/dev/disk/by-id/${ssd}"
+    refresh_disk "/dev/disk/by-id/${ssd}"
+    
     cmd $SGDISK "/dev/disk/by-id/${hdd}" --clear
 done
 
