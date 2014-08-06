@@ -5,20 +5,65 @@ set -e
 hostname=''
 declare -a hdds
 declare -a ssds
-zlogsize='1024MiB'
+zlog_hsize='1024MiB'
+swap_size='512MiB'
+boot_size='256MiB'
+efi_size='256MiB'
 test_only=1
+non_interactive=0
 pool_name=''
 mount_path=''
 
 print_help()
 {
-    echo "Usage: $0 -h hostname -d (hdd-id ...) -s (ssd-id ...) [-l zlogsize] [-m mount_path] [-r]" 1>&2
+    cat 1>&2 <<EOF
+Usage: $0 -h hostname -d hdd-disk-id [-d ...] -s ssd-disk-id [-s ...]
+    -m mount-path [-l zlog-size] [-w swap-size] [-p pool-name] [-T]
+Options:
+    -h hostname       
+                      Specify the hostname to use temporarily. Will possibly be
+                      used to generate the hostid by ZFS
+    -d hdd-disk-id    
+                      Specify the ID of a disk to include in the main storage
+                      pool. Should be something that exists in /dev/disk/by-id,
+                      without the folder name. e.g. wwn-********, scsi-********
+                      Repeat for multiple disks. Number of disks must be even.
+    -s ssd-disk-id    
+                      Specify the ID of a disk to use as utility, ZFS SLOG and
+                      cache disks. Should be an SSD. Repeat for multiple disks.
+                      Number of disks must be 1 or a multiple of two
+    -m mount-path
+                      Where to mount the root FS created from the pool after
+                      everything is done.
+    -l zlog-size      
+                      Size to use for the ZFS SLOG partitions. Will be mirrored
+                      on all provided SSDs. Defaults to ${slogsize} if not
+                      specified. Should usually be expresed as '{num}MiB'.
+    -w swap-size      
+                      Size to use for the swap partitions. Will be mirrored on
+                      all provided SSDs. Defaults to ${swap_size}.
+    -b boot-size
+                      Size to use for the boot partitions. Will be mirrored on
+                      all provided SSDs. Defaults to ${boot_size}.
+    -e efi-size
+                      Size to use for the EFI partition on the first SSD.
+                      Defaults to ${efi_size}
+    -p pool-name
+                      Use an specific pool name instead of defaulting to the
+                      host name (without domain)
+    -t
+                      Actually perform all the actions instead of doing a
+                      dry-run as per default. Will ask you to confirm setup
+                    before proceding
+    -y
+                      Answer yes to all prompts by default (be careful!)
+EOF
 }
 
 cmd()
 {
     echo + "$@"
-    if [ $test_only -eq 0 ]; then
+    if (( test_only == 0 )); then
         "$@"
         return $?
     else
@@ -35,7 +80,25 @@ array_contains()
     return 1
 }
 
-while getopts "h:d:s:l:rp:m:" opt; do
+confirm()
+{
+    if (( yes == 1 )); then
+        return 0
+    else
+        read -p "$1" -r
+        case "$REPLY" in
+            [Yy])
+                return 0
+            ;;
+            [Yy][Ee][Ss])
+                return 0
+        esac
+
+        return 1
+    fi
+}
+
+while getopts "h:d:s:m:l:w:b:p:tT" opt; do
     case $opt in
     h)
         hostname=$OPTARG
@@ -46,17 +109,29 @@ while getopts "h:d:s:l:rp:m:" opt; do
     s)
         ssds+=("$OPTARG")
     ;;
+    m)
+        mount_path="$OPTARG"
+    ;;
     l)
-        zlogsize="$OPTARG"
+        slog_size="$OPTARG"
+    ;;
+    w)
+        swap_size="$OPTARG"
+    ;;
+    b)
+        boot_size="$OPTARG"
+    ;;
+    e)
+        efi_size="$OPTARG"
     ;;
     p)
         pool_name="$OPTARG"
     ;;
-    m)
-        mount_path="$OPTARG"
-    ;;
-    r)
+    t)
         test_only=0
+    ;;
+    y)
+        yes=1
     ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
@@ -69,23 +144,16 @@ while getopts "h:d:s:l:rp:m:" opt; do
     esac
 done
 
-if [ -z "$hostname" ] || [ -z "$zlogsize" ]; then
+if [ -z "$hostname" ] || [ -z "$slog_size" ] || [ -z "$swap_size" ] \
+   || [ -z "$boot_size" ] || [ -z "$efi_size" ]
+then
     print_help
     exit 1
 fi
 
 if [ -z "$pool_name" ]; then
-    pool_name="$hostname"
+    pool_name="${hostname%%.*}"
 fi
-
-if [ -z "$mount_path" ]; then
-    mount_path="/mnt/${pool_name}"
-fi
-
-echo "Using hostname '$hostname'"
-old_hostname=$(hostname)
-trap 'hostname ${old_hostname}' EXIT 
-hostname ${hostname}
 
 hdd_count="${#hdds[@]}" 
 ssd_count="${#ssds[@]}"
@@ -95,10 +163,17 @@ if (( hdd_count < 2 )) || (( hdd_count % 2 != 0 )); then
     exit 1
 fi
 
-if (( ssd_count < 2 )) || (( ssd_count % 2 != 0 )); then
-    echo "Invalid SSD count ${ssd_count}: must be multiple of 2, non-zero"
+if (( ssd_count < 1 )) || (( ssd_count == 1 || ssd_count % 2 != 0 )); then
+    echo "Invalid SSD count ${ssd_count}: must be 1 or a multiple of 2"
     exit 1
 fi
+
+echo "Using hostname '${hostname}'"
+old_hostname=$(hostname)
+trap "hostname '${old_hostname}'" EXIT 
+hostname "$hostname"
+
+echo "Using pool name '${pool_name}'"
 
 check_disks()
 {
@@ -133,39 +208,38 @@ declare -A ssd_devs
 check_disks "ssd_devs" "${ssds[@]}"
 echo
 
-boot_ssd="${ssds[0]}"
-echo "Using disk ${boot_ssd} for boot"
-
-swap_ssd="${ssds[1]}"
-echo "Using disk ${swap_ssd} for swap"
-
-slog_ssds=("${boot_ssd}" "${swap_ssd}")
-echo "Using ZIL SLOG size of ${zlogsize} on disks:"
-for ssd in "${slog_ssds[@]}"; do
-    echo "- ${ssd}"
-done
-
 echo 
 
-if [ $test_only -eq 0 ]; then
-    read -p "Is everything right? Type YES to proceeed: " -r
-    if ! [ "$REPLY" == "YES" ]; then
+if (( ssd_count == 1 )); then
+    echo "Only one SSD selected. Your boot, swap and SLOG will not be mirrored."
+    if ! confirm "Disk failures will cause data and availability loss. Proceed? [y/n]"; then
+        exit 1
+    fi
+fi
+
+if (( test_only == 0 )); then
+    if ! confirm "Verify all information for correctness. Proceed? [y/n]"; then
         exit 1
     fi
 
-    read -p "Are you sure? Type IAMSURE to proceeed: " -r
-    if ! [ "$REPLY" == "IAMSURE" ]; then
+    if ! confirm "Destructive actions will be performed. Are you sure? [y/n]"; then
         exit 1
     fi
 fi
 
 echo "* Destroying existing pool"
 
-cmd zpool status "$pool_name" && cmd zpool destroy "$pool_name" 
+if (( test_only == 0 )) && zpool status "$pool_name"; then
+    if ! confirm "A zpool named ${pool_name} already exists. Destroy it and proceed? [y/n]"; then
+        exit 1
+    fi
+    cmd zpool destroy "$pool_name" 
+fi
 
 echo "* Formatting SSDs"
 
 SGDISK="sgdisk -a 2048"
+efi_created=0
 
 for ssd in "${ssds[@]}"; do
     echo "** Formatting ${ssd}"
@@ -176,58 +250,79 @@ for ssd in "${ssds[@]}"; do
     cmd hdparm -z "/dev/disk/by-id/${ssd}"
     cmd $SGDISK_SSD --clear
 
-    if [ "$ssd" = "$boot_ssd" ]; then
-        echo "** Creating boot partitions"
-        
-        cmd $SGDISK_SSD --new=1:1M:+255M \
+    if (( efi_created == 0 )); then
+        echo "** Creating EFI partition"
+            
+        cmd $SGDISK_SSD --new="1:0:+${efi_size}" \
           -c 1:"EFI System Partition" \
           -t 1:"ef00"
-        cmd $SGDISK_SSD --new=2:0:+256M \
-          -c 2:"/boot" \
-          -t 2:"8300"
-
-        cmd sleep 1
-
-        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part1"
-        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part2"
-
-        cmd mkfs.vfat "/dev/disk/by-id/${ssd}-part1"
-        cmd mkfs.ext2 -m 0 -L /boot -j "/dev/disk/by-id/${ssd}-part2"
-    elif [ "$ssd" = "$swap_ssd" ]; then
-        echo "** Creating swap partitions"
-        
-        cmd $SGDISK_SSD --new=1:1M:+511M \
-          -c 1:"Linux Swap" \
-          -t 1:"8200"
-
-        cmd sleep 1
 
         cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part1"
 
-        cmd mkswap "/dev/disk/by-id/${ssd}-part1"
-    fi
-
-    if array_contains "$ssd" "${slog_ssds[@]}"; then
-        echo "** Creating ZIL SLOG partition"
-        cmd $SGDISK_SSD --new=3:0:+"${zlogsize}" \
-          -c 3:"ZFS SLOG" \
-          -t 3:"bf01"
-
-        echo "** Creating L2ARC partition"
-        cmd $SGDISK_SSD --new=4:0:0 \
-          -c:4:"ZFS L2ARC" \
-          -t 4:"bf01"
-
-        cmd sleep 1
-
-        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
-        cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
+        efi_created=1
+        boot_start=0
     else
-        echo "** Skipping partitioning, to be used as whole disk"
+        echo "** Skipping size of EFI partition in secondary disk"
+        boot_start="$efi_size"
     fi
+
+    echo "** Creating boot partition"
+    cmd $SGDISK_SSD --new="2:${boot_start}:+${boot_size}" \
+     -c 2:"/boot" \
+     -t 2:"8300"
+    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part2"
+
+    echo "** Creating swap partition"
+    cmd $SGDISK_SSD --new="3:0:+${swap_size}" \
+     -c 1:"Linux Swap" \
+     -t 1:"8200"
+    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part3"
+
+    echo "** Creating SLOG partition"
+    cmd $SGDISK_SSD --new="4:0:+${slog_size}" \
+     -c 3:"ZFS SLOG" \
+     -t 3:"bf01"
+    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part4"
+
+    echo "** Creating L2ARC partition in remaining space"
+    cmd $SGDISK_SSD --new=5:0:0 \
+     -c:4:"ZFS L2ARC" \
+     -t 4:"bf01"
+    cmd zpool labelclear -f "/dev/disk/by-id/${ssd}-part5"
 
     echo
 done
+
+ssd_partition_refs()
+{
+    part_num="$1"
+    for ssd in "${ssds[@]}"; do
+        echo -n "/dev/disk/by-id/${ssd}-part${part_num} "
+    fi
+}
+
+if (( ssd_count > 1 )); then
+    echo "* Creating MDADM devices"
+    boot_dev=/dev/md/boot
+    cmd mdadm --create --verbose "$boot_dev" --level=mirror --raid-devices="${ssd_count}" \
+     $(ssd_partitition_refs 2)
+
+    swap_dev=/dev/md/swap
+    cmd mdadm --create --verbose "$swap_dev" --level=mirror --raid-devices="${ssd_count}" \
+     $(ssd_partitition_refs 3)
+else
+    boot_dev="/dev/disk/by-id/${ssds[0]}-part2"
+    swap_dev="/dev/disk/by-id/${ssds[0]}-part3"
+fi
+
+echo "* Formatting SSD partitions"
+
+efi_dev="/dev/disk/by-id/${ssds[0]}-part1"
+cmd mkfs.vfat -n "EFI System Partition" "$efi_dev"
+
+cmd mkfs.ext2 -L "/boot" "$boot_dev"
+
+cmd mkswap "$swap_dev"
 
 echo "* Clearing HDDs"
 for hdd in "${hdds[@]}"; do
