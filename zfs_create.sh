@@ -96,39 +96,17 @@ rand_uuid()
 
 while getopts "h:d:s:m:e:b:w:l:p:ty" opt; do
     case $opt in
-    h)
-        hostname=$OPTARG
-    ;;
-    d)
-        hdds+=("$OPTARG")
-    ;;
-    s)
-        ssds+=("$OPTARG")
-    ;;
-    m)
-        mount_path="$OPTARG"
-    ;;
-    l)
-        slog_size="$OPTARG"
-    ;;
-    w)
-        swap_size="$OPTARG"
-    ;;
-    b)
-        boot_size="$OPTARG"
-    ;;
-    e)
-        efi_size="$OPTARG"
-    ;;
-    p)
-        pool_name="$OPTARG"
-    ;;
-    t)
-        test_only=0
-    ;;
-    y)
-        yes=1
-    ;;
+    h) hostname=$OPTARG ;;
+    d) hdds+=("$OPTARG") ;;
+    s) ssds+=("$OPTARG") ;;
+    m) mount_path="$OPTARG" ;;
+    l) slog_size="$OPTARG" ;;
+    w) swap_size="$OPTARG" ;;
+    b) boot_size="$OPTARG" ;;
+    e) efi_size="$OPTARG" ;;
+    p) pool_name="$OPTARG" ;;
+    t) test_only=0 ;;
+    y) yes=1 ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
         exit 1
