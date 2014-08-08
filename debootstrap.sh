@@ -27,7 +27,7 @@ while getopts "hm:n:b:e:i:" opt; do
     esac
 done
 
-shift $OPTIND
+shift $(( OPTIND-1 ))
 
 [ -n "$LANG" ] || LANG='en_US.UTF-8'
 export LANG
