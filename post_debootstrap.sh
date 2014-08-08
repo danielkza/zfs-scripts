@@ -3,7 +3,7 @@
 set -e
 cd /root
 
-src_dir=$(dirname "{BASH_SOURCE[0]}")
+src_dir=$(readlink -f "$(dirname "{BASH_SOURCE[0]}")")
 zfs_prereqs="${src_dir}/zfs_prerequisites.sh"
 if ! [ -x "$zfs_prereqs" ]; then
     echo "Missing prerequisites script"
