@@ -23,11 +23,11 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
 
-# /dev/disk/by-partuuid is broken in Wheezy. Install udev from backports to fix
-# that.
-
 apt-get install -y linux-{image,headers}-amd64 \
  mdadm gdisk dosfstools e2fsprogs
+
+# /dev/disk/by-partuuid is broken in Wheezy. Install udev from backports to fix
+# that.
 
 apt-get install -y -t wheezy-backports udev
 

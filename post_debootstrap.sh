@@ -61,8 +61,18 @@ fi
 
 apt-get update
 
-# Install new kernel before ZFS so module is correctly built
+# Make sure mdadm.conf is used
+
+# Install kernels before ZFS so module is correctly built
+apt-get install -y linux-{image,headers}-amd64
+
+# Needed by 3.14
+apt-get install -y perl-modules
 apt-get install -t wheezy-backports -y linux-{image,headers}-amd64
+
+if [ -f /etc/mdadm/mdadm.conf ] && [ -f /var/lib/mdadm/CONF-UNCHECKED ]; then
+    rm -f /var/lib/mdadm/CONF-UNCHECKED
+fi
 
 if ! "$zfs_prereqs"; then
     echo "ZFS prereqs failed"
