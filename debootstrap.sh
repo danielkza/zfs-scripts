@@ -32,13 +32,15 @@ shift $(( OPTIND-1 ))
 [ -n "$LANG" ] || LANG='en_US.UTF-8'
 export LANG
 
-if ! [ -d "$mount_path" ]; then
-    echo "Invalid mount-path" >&2
+if [ -z "$mount_path" ] || [ -z "$target_hostname" ] || [ -z "$boot_uuid" ] \
+   || [ -z "$efi_uuid" ]
+then
+    print_help
     exit 1
 fi
 
-if [ -z "$target_hostname" ] || [ -z "$boot_uuid" ] || [ -z "$efi_uuid" ]; then
-    print_help
+if ! [ -d "$mount_path" ]; then
+    echo "Invalid mount-path" >&2
     exit 1
 fi
 
