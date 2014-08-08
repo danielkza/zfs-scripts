@@ -143,9 +143,12 @@ if (( ssd_count < 1 )) || (( ssd_count == 1 || ssd_count % 2 != 0 )); then
 fi
 
 echo "Using hostname '${hostname}'"
-old_hostname=$(hostname)
-trap "hostname '${old_hostname}'" EXIT 
-hostname "$hostname"
+
+if (( test_only != 0 )); then
+    old_hostname=$(hostname)
+    trap "hostname '${old_hostname}'" EXIT
+fi
+cmd hostname "$hostname"
 
 echo "Using pool name '${pool_name}'"
 
