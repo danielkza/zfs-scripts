@@ -70,13 +70,13 @@ apt-get install -y linux-{image,headers}-amd64
 apt-get install -y perl-modules
 apt-get install -t wheezy-backports -y linux-{image,headers}-amd64
 
-if [ -f /etc/mdadm/mdadm.conf ] && [ -f /var/lib/mdadm/CONF-UNCHECKED ]; then
-    rm -f /var/lib/mdadm/CONF-UNCHECKED
-fi
-
 if ! "$zfs_prereqs"; then
     echo "ZFS prereqs failed"
     exit 1
+fi
+
+if [ -f /etc/mdadm/mdadm.conf ] && [ -f /var/lib/mdadm/CONF-UNCHECKED ]; then
+    rm -f /var/lib/mdadm/CONF-UNCHECKED
 fi
 
 # Install base packages
