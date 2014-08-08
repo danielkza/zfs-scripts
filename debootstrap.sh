@@ -12,7 +12,7 @@ while getopts "hm:n:b:e:i:" opt; do
     case $opt in
     h) print_help; exit 1 ;;
     m) mount_path="$OPTARG" ;;
-    h) target_hostname="$OPTARG" ;;
+    n) target_hostname="$OPTARG" ;;
     b) boot_uuid="$OPTARG" ;;
     e) efi_uuid="$OPTARG" ;;
     i) mirror="$OPTARG" ;;
