@@ -7,11 +7,12 @@ hostname="$2"
 boot_uuid="$3"
 efi_uuid="$4"
 mirror="$5"
+shift 5
 
-[ -n "$LANG" ] || LANG='en_US.UTF-8'
+[ -n "$LANG" ] || export LANG='en_US.UTF-8'
 
 if [ $# -lt 4 ]; then
-    echo "Usage: $0 target_path hostname boot_uuid efi_uuid [mirror]"
+    echo "Usage: $0 target_path hostname boot_uuid efi_uuid [mirror] [extra-package ...]"
     exit 1
 fi
 
@@ -37,12 +38,20 @@ fi
 
 [ -n "$mirror" ] || mirror='http://debian.c3sl.ufpr.br/debian'
 
+extra_packages=("$@")
+
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y debootstrap
 
-debootstrap --arch=amd64 \
- --include=ifupdown,netbase,net-tools,iproute,openssh-server \
-  wheezy "$target" "$mirror"
+packages() {
+    default_packages=ifupdown,netbase,net-tools,iproute,openssh-server
+    echo -n "$default_packages"
+    for pkg in "${extra_packages[@]}"; do
+        echo -n ",${pkg}"
+    done
+}
+
+debootstrap --arch=amd64 --include=$(packages) wheezy "$target" "$mirror"
 
 echo "$hostname" > "${target}/etc/hostname"
 sed "s/debian/${hostname}/" /etc/hosts > "${target}/etc/hosts"
