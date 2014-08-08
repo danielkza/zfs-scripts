@@ -27,7 +27,9 @@ apt-get update
 # that.
 
 apt-get install -y linux-{image,headers}-amd64 \
- gdisk dosfstools e2fsprogs udev/wheezy-backports
+ mdadm gdisk dosfstools e2fsprogs
+
+apt-get install -y -t wheezy-backports udev
 
 udevadm trigger
 
