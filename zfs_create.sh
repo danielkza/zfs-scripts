@@ -71,6 +71,27 @@ cmd()
     fi
 }
 
+upper()
+{
+    echo "$1" | tr '[:lower:]' '[:upper:]'
+}
+
+find_executable()
+{
+    local name=$(upper "$1") path
+    if [ -n "${!name}" ]; then
+        path=$(which "$1")
+        if ! [ -x "$path" ]; then
+            echo "${name} not found in PATH"
+            return 1
+        fi
+        
+        echo "Using ${name} => ${path}" 2>
+        eval "${var}='${path}'"
+    fi
+    return 0
+}
+
 confirm()
 {
     if (( yes == 1 )); then
