@@ -121,7 +121,7 @@ rand_uuid()
     cat /proc/sys/kernel/random/uuid
 }
 
-while getopts "h:n:d:s:m:e:b:w:l:p:ty" opt; do
+while getopts "hn:d:s:m:e:b:w:l:p:ty" opt; do
     case $opt in
     h) print_help; exit 1 ;;
     n) target_hostname="$OPTARG" ;;

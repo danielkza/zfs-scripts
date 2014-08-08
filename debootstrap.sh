@@ -8,7 +8,7 @@ print_help()
     exit 1
 }
 
-while getopts "h:m:n:b:e:i:" opt; do
+while getopts "hm:n:b:e:i:" opt; do
     case $opt in
     h) print_help; exit 1 ;;
     m) mount_path="$OPTARG" ;;
