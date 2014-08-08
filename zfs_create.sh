@@ -211,7 +211,7 @@ if (( test_only == 0 )); then
     fi
 fi
 
-if (( test_only == 0 )) && zpool list -H -o name "$pool_name"; then
+if (( test_only == 0 )) && zpool list -H -o name "$pool_name" 2>/dev/null; then
     if ! confirm "A zpool named ${pool_name} already exists. Destroy it and proceed?"; then
         exit 1
     fi
