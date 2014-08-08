@@ -2,37 +2,53 @@
 
 set -e
 
-target="$1"
-hostname="$2"
-boot_uuid="$3"
-efi_uuid="$4"
-mirror="$5"
-shift 5
+print_help()
+{
+    echo "Usage: $0 [-h] -m mount-path -n hostname -b boot-uuid -e efi-uuid [-i mirror] [extra-package ...]" >&2
+    exit 1
+}
 
-[ -n "$LANG" ] || export LANG='en_US.UTF-8'
+while getopts "h:m:n:b:e:i:" opt; do
+    case $opt in
+    h) print_help; exit 1 ;;
+    m) mount_path="$OPTARG" ;;
+    h) target_hostname="$OPTARG" ;;
+    b) boot_uuid="$OPTARG" ;;
+    e) efi_uuid="$OPTARG" ;;
+    i) mirror="$OPTARG" ;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        exit 1
+    ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        exit 1
+    ;;
+    esac
+done
 
-if [ $# -lt 4 ]; then
-    echo "Usage: $0 target_path hostname boot_uuid efi_uuid [mirror] [extra-package ...]"
+shift $OPTIND
+
+[ -n "$LANG" ] || LANG='en_US.UTF-8'
+export LANG
+
+if ! [ -d "$mount_path" ]; then
+    echo "Invalid mount-path" >&2
     exit 1
 fi
 
-if ! [ -d "$target" ]; then
-    echo "Invalid target"
+if [ -z "$target_hostname" ] || [ -z "$boot_uuid" ] || [ -z "$efi_uuid" ]; then
+    print_help
     exit 1
 fi
 
-if [ -z "$hostname" ]; then
-    echo "Invalid hostname"
+if ! blkid -t UUID="$boot_uuid" 2>&1 >/dev/null; then
+    echo "Invalid boot-uuid" >&2
     exit 1
 fi
 
-if [ -z "$boot_uuid" ] || ! blkid -t UUID="$boot_uuid"; then
-    echo "Invalid boot_uuid"
-    exit 1
-fi
-
-if [ -z "$efi_uuid" ] || ! blkid -t UUID="$efi_uuid"; then
-    echo "Invalid efi_uuid"
+if ! blkid -t UUID="$efi_uuid" 2>&1 >/dev/null; then
+    echo "Invalid efi-uuid" >&2
     exit 1
 fi
 
@@ -51,17 +67,17 @@ packages() {
     done
 }
 
-debootstrap --arch=amd64 --include=$(packages) wheezy "$target" "$mirror"
+debootstrap --arch=amd64 --include=$(packages) wheezy "$mount_path" "$mirror"
 
-echo "$hostname" > "${target}/etc/hostname"
-sed "s/debian/${hostname}/" /etc/hosts > "${target}/etc/hosts"
+echo "$target_hostname" > "${mount_path}/etc/hostname"
+sed "s/debian/${hostname}/" /etc/hosts > "${mount_path}/etc/hosts"
 
-cat > "${target}/etc/fstab" <<EOF
+cat > "${mount_path}/etc/fstab" <<EOF
 UUID=${boot_uuid} /boot auto defaults 0 1
 UUID=${efi_uuid} /boot/efi auto defaults 0 1
 EOF
 
-cat > "${target}/etc/network/interfaces" <<'EOF'
+cat > "${mount_path}/etc/network/interfaces" <<'EOF'
 # interfaces(5) file used by ifup(8) and ifdown(8)
 auto lo
 iface lo inet loopback
@@ -75,6 +91,6 @@ allow-hotplug eth1
 iface eth1 inet dhcp
 EOF
 
-echo "LANG=${LANG}" > "${target}/etc/default/locale"
+echo "LANG=${LANG}" > "${mount_path}/etc/default/locale"
 
-ln -s /proc/mounts "${target}/etc/mtab"
+ln -s /proc/mounts "${mount_path}/etc/mtab"
