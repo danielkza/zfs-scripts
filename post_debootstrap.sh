@@ -61,8 +61,8 @@ fi
 
 apt-get update
 
-# Install kernel before ZFS so module is correctly built
-apt-get install -y linux-{image,headers}-3.12-0.bpo.1-amd64/wheezy-backports
+# Install new kernel before ZFS so module is correctly built
+apt-get install -t wheezy-backports -y linux-{image,headers}-amd64
 
 if ! "$zfs_prereqs"; then
     echo "ZFS prereqs failed"
