@@ -2,20 +2,44 @@
 
 set -e
 
+DEFAULT_PACKAGES=(ifupdown netbase net-tools iproute openssh-server)
+DEFAULT_MIRROR='http://http.debian.net/debian'
+
+###
+
 print_help()
 {
-    echo "Usage: $0 [-h] -m mount-path -n hostname -b boot-uuid -e efi-uuid [-i mirror] [extra-package ...]" >&2
-    exit 1
+    local program=$(basename "$0")
+    cat >&2 <<EOF
+Usage: ${program} [-h] -n hostname -b boot-uuid -e efi-uuid -w swap-uuid
+    [-p pkg1,pkg2,...] suite target [mirror [script]] [debootstrap-options ...]
+Details:
+    Options to be passed to deboostrap must come after the positional arguments,
+    unlike in the original command. This is necessary to distinguish them from
+    the arguments to this script. 
+EOF
 }
 
-while getopts "hm:n:b:e:i:" opt; do
+declare -a packages=("${DEFAULT_PACKAGES[@]}")
+
+while getopts "hn:b:e:w:p:" opt; do
     case $opt in
     h) print_help; exit 1 ;;
-    m) mount_path="$OPTARG" ;;
-    n) target_hostname="$OPTARG" ;;
+    n) target_fqdn="$OPTARG" ;;
     b) boot_uuid="$OPTARG" ;;
     e) efi_uuid="$OPTARG" ;;
-    i) mirror="$OPTARG" ;;
+    w) swap_uuid="$OPTARG" ;;
+    p)
+        declare -a extra_packages
+        if ! IFS=',' read -ra extra_packages <<< "$OPTARG" \
+           || ! (( ${#extra_packages[@]} ))
+        then
+            echo "Invalid value for -${opt}: '${OPTARG}'" >&2
+            exit 1
+        fi
+
+        packages=("${packages[@]}" "${extra_packages[@]}")
+    ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
         exit 1
@@ -27,57 +51,89 @@ while getopts "hm:n:b:e:i:" opt; do
     esac
 done
 
-shift $(( OPTIND-1 ))
+shift $(( OPTIND - 1 ))
 
-[ -n "$LANG" ] || LANG='en_US.UTF-8'
-export LANG
+for (( i = 1; i <= 4; ++i )); do
+    [[ "${!i}" != -* ]] || break
+    case $i in
+    1) suite="${!i}" ;;
+    2) target="${!i}" ;;
+    3) mirror="${!i}" ;;
+    4) script="${!i}"
+    esac
+done
 
-if [ -z "$mount_path" ] || [ -z "$target_hostname" ] || [ -z "$boot_uuid" ] \
-   || [ -z "$efi_uuid" ]
+shift $(( i - 1 ))
+
+###
+
+if [[ -z "$suite" || -z "$target" || -z "$target_fqdn" ]] \
+   || [[ -z "$boot_uuid" || -z "$efi_uuid" || -z "$swap_uuid" ]]
 then
     print_help
     exit 1
 fi
 
-if ! [ -d "$mount_path" ]; then
-    echo "Invalid mount-path" >&2
+if ! [[ -d "$target" ]]; then
+    echo "Error: '$target' is not a valid directory." >&2
     exit 1
 fi
 
-if ! blkid -t UUID="$boot_uuid" 2>&1 >/dev/null; then
-    echo "Invalid boot-uuid" >&2
-    exit 1
-fi
+[[ -n "$mirror" ]] || mirror="$DEFAULT_MIRROR"
 
-if ! blkid -t UUID="$efi_uuid" 2>&1 >/dev/null; then
-    echo "Invalid efi-uuid" >&2
-    exit 1
-fi
+target_fqdn="$target_hostname"
+target_hostname="${target_hostname%%.*}"
 
-[ -n "$mirror" ] || mirror='http://debian.c3sl.ufpr.br/debian'
+###
 
-extra_packages=("$@")
+check_dev_uuid()
+{
+    local name="$1" uuid="$2"
+    local dev=$(blkid -U "$uuid")
+    if (( $? != 0 )) || ! [[ -b "$dev" ]]; then
+        echo "Error: No '${name}' device found with UUID '${uuid}'" >&2
+        return 1
+    fi
 
-export DEBIAN_FRONTEND=noninteractive
-apt-get install -y debootstrap
-
-packages() {
-    default_packages=ifupdown,netbase,net-tools,iproute,openssh-server
-    echo -n "$default_packages"
-    for pkg in "${extra_packages[@]}"; do
-        echo -n ",${pkg}"
-    done
+    echo "Found ${dev} for '${name}' device" >&2
+    echo -n "$dev"
+    return 0
 }
 
-debootstrap --arch=amd64 --include=$(packages) wheezy "$mount_path" "$mirror"
+efi_dev=$(check_dev_uuid efi "$efi_uuid") \
+boot_dev=$(check_dev_uuid boot "$boot_uuid")
+[[ -z "$swap_uuid" ]] || swap_dev=$(check_dev_uuid swap "$swap_uuid")
+
+###
+
+[[ -n "$LANG" ]] || LANG='en_US.UTF-8'
+export LANG
+export DEBIAN_FRONTEND=noninteractive
+
+###
+
+apt-get install -y debootstrap
+
+debootstrap --arch=amd64 \
+ --include=$(IFS=',' echo "${packages[*]}") \
+ wheezy "$mount_path" "$mirror"
 
 echo "$target_hostname" > "${mount_path}/etc/hostname"
-sed "s/debian/${hostname}/" /etc/hosts > "${mount_path}/etc/hosts"
+
+if ! [ -f "${mount_path}/etc/hosts" ]; then
+    cp /etc/hosts "${mount_path}/etc/hosts"
+fi
+
+(echo "127.0.0.1 localhost ${target_hostname}"; \
+ sed -e '/127.0.0.1/d' "${mount_path}/etc/hosts") > "${mount_path}/etc/hosts"
 
 cat > "${mount_path}/etc/fstab" <<EOF
-UUID=${boot_uuid} /boot auto defaults 0 1
-UUID=${efi_uuid} /boot/efi auto defaults 0 1
+UUID=${boot_uuid}  /boot      ext2  defaults  0  1
+UUID=${efi_uuid}   /boot/efi  vfat  defaults  0  1
+UUID=${swap_uuid}  none       swap  defaults  0  0
 EOF
+
+
 
 cat > "${mount_path}/etc/network/interfaces" <<'EOF'
 # interfaces(5) file used by ifup(8) and ifdown(8)
