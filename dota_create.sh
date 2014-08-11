@@ -1,7 +1,9 @@
 #!/bin/bash
 
+set -e
+
 b=/dev/disk/by-id
-src_dir=$(dirname "{BASH_SOURCE[0]}")
+src_dir=$(readlink -f $(dirname "{BASH_SOURCE[0]}"))
 
 "${src_dir}/zfs_create.sh" \
   -n dota.linux.ime.usp.br -m /mnt/dota -e 256M -b 256M -w 1024M -l 1024M \
@@ -12,4 +14,5 @@ src_dir=$(dirname "{BASH_SOURCE[0]}")
   -d $b/wwn-0x6c81f660db7624001a82f12713c26bcc \
   -d $b/wwn-0x6c81f660db7624001a82f13614a1c590 \
   -s $b/wwn-0x6c81f660db7624001a82f16017237ae7 \
-  -s $b/wwn-0x6c81f660db7624001a82f171182cc38b "$@"
+  -s $b/wwn-0x6c81f660db7624001a82f171182cc38b \
+  "$@"
