@@ -12,7 +12,8 @@ print_help()
     local program=$(basename "$0")
     cat >&2 <<EOF
 Usage: ${program} [-h] -n hostname -b boot-uuid -e efi-uuid -w swap-uuid
-    [-p pkg1,pkg2,...] suite target [mirror [script]] [debootstrap-options ...]
+    [-p pkg1,pkg2,pkgN] [-p ...] [-l locale1,locale2,localeN]
+    suite target [mirror [script]] [debootstrap-options ...]
 Details:
     Options to be passed to deboostrap must come after the positional arguments,
     unlike in the original command. This is necessary to distinguish them from
@@ -20,9 +21,19 @@ Details:
 EOF
 }
 
-declare -a packages=("${DEFAULT_PACKAGES[@]}")
+read_array_param()
+{
+    if ! IFS=',' read -ra "$1" <<< "$OPTARG"; then
+        echo "Invalid value for -${opt}: '${OPTARG}'" >&2
+        return 1
+    fi
+    return 0
+}
 
-while getopts "hn:b:e:w:p:" opt; do
+declare -a packages=("${DEFAULT_PACKAGES[@]}")
+declare -a locales
+
+while getopts "hn:b:e:w:p:l:" opt; do
     case $opt in
     h) print_help; exit 1 ;;
     n) target_fqdn="$OPTARG" ;;
@@ -30,15 +41,11 @@ while getopts "hn:b:e:w:p:" opt; do
     e) efi_uuid="$OPTARG" ;;
     w) swap_uuid="$OPTARG" ;;
     p)
-        declare -a extra_packages
-        if ! IFS=',' read -ra extra_packages <<< "$OPTARG" \
-           || ! (( ${#extra_packages[@]} ))
-        then
-            echo "Invalid value for -${opt}: '${OPTARG}'" >&2
-            exit 1
-        fi
-
-        packages=("${packages[@]}" "${extra_packages[@]}")
+        read_array_param extra_packages || exit 1
+        packages+=("${extra_packages[@]}")
+    ;;
+    l) 
+        read_array_param locales || exit 1
     ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
@@ -54,7 +61,10 @@ done
 shift $(( OPTIND - 1 ))
 
 for (( i = 1; i <= 4; ++i )); do
-    [[ "${!i}" != -* ]] || break
+    if (( i > $# )) || [[ "${!i}" == -* ]]; then
+        break
+    fi
+
     case $i in
     1) suite="${!i}" ;;
     2) target="${!i}" ;;
@@ -66,6 +76,9 @@ done
 shift $(( i - 1 ))
 
 ###
+
+echo "$suite $target $mirror $script"
+
 
 if [[ -z "$suite" || -z "$target" || -z "$target_fqdn" ]] \
    || [[ -z "$boot_uuid" || -z "$efi_uuid" || -z "$swap_uuid" ]]
@@ -81,8 +94,7 @@ fi
 
 [[ -n "$mirror" ]] || mirror="$DEFAULT_MIRROR"
 
-target_fqdn="$target_hostname"
-target_hostname="${target_hostname%%.*}"
+target_hostname="${target_fqdn%%.*}"
 
 ###
 
@@ -106,49 +118,74 @@ boot_dev=$(check_dev_uuid boot "$boot_uuid")
 
 ###
 
-[[ -n "$LANG" ]] || LANG='en_US.UTF-8'
-export LANG
+[[ -n "$LANG" ]] || export LANG='en_US.UTF-8'
 export DEBIAN_FRONTEND=noninteractive
 
 ###
 
 apt-get install -y debootstrap
 
-debootstrap --arch=amd64 \
- --include=$(IFS=',' echo "${packages[*]}") \
- wheezy "$mount_path" "$mirror"
+[[ -n "$DEBOOTSTRAP" ]] || DEBOOTSTRAP=debootstrap
 
-echo "$target_hostname" > "${mount_path}/etc/hostname"
+"$DEBOOTSTRAP" --include="$(IFS=','; echo "${packages[*]}")" \
+ "$suite" "$target" ${mirror:+"$mirror"} ${script:+"$script"} \
+ "$@"
 
-if ! [ -f "${mount_path}/etc/hosts" ]; then
-    cp /etc/hosts "${mount_path}/etc/hosts"
+###
+
+echo "$target_hostname" > "${target}/etc/hostname"
+
+hosts="${target}/etc/hosts"
+
+if ! [[ -f "$hosts" ]]; then
+    cp /etc/hosts "$hosts" 
 fi
 
-(echo "127.0.0.1 localhost ${target_hostname}"; \
- sed -e '/127.0.0.1/d' "${mount_path}/etc/hosts") > "${mount_path}/etc/hosts"
+(echo "127.0.0.1 localhost"; \
+ sed -e '/^127\.0\./d' "$hosts") > "${hosts}.tmp"
+mv "${hosts}.tmp" "$hosts"
 
-cat > "${mount_path}/etc/fstab" <<EOF
+###
+
+fstab="${target}/etc/fstab"
+
+cat > "$fstab" <<EOF
 UUID=${boot_uuid}  /boot      ext2  defaults  0  1
 UUID=${efi_uuid}   /boot/efi  vfat  defaults  0  1
+EOF
+
+if [[ -n "$swap_uuid" ]]; then
+    cat >> "$fstab" <<EOF
 UUID=${swap_uuid}  none       swap  defaults  0  0
 EOF
+fi
 
+###
 
+interfaces="${target}/etc/network/interfaces"
 
-cat > "${mount_path}/etc/network/interfaces" <<'EOF'
-# interfaces(5) file used by ifup(8) and ifdown(8)
-auto lo
-iface lo inet loopback
+if ! [[ -f "$interfaces"  ]]; then
+    cp /etc/network/interfaces "$interfaces"
+fi
 
-auto eth0
-allow-hotplug eth0
-iface eth0 inet dhcp
-    
-auto eth1
-allow-hotplug eth1
-iface eth1 inet dhcp
+###
+
+cat > "${target}/etc/apt/sources.list" <<EOF
+deb ${mirror} ${suite} main contrib non-free
+deb-src ${mirror} ${suite} main contrib non-free
+deb http://security.debian.org/ ${suite}/updates main
+deb-src http://security.debian.org/ ${suite}/updates main
 EOF
 
-echo "LANG=${LANG}" > "${mount_path}/etc/default/locale"
+cat > "${target}/etc/apt/sources.list.d/${suite}-backports.list" <<EOF
+deb ${mirror} ${suite}-backports main contrib non-free
+deb-src ${mirror} ${suite}-backports main contrib non-free
+EOF
 
-ln -s /proc/mounts "${mount_path}/etc/mtab"
+###
+
+echo "LANG=${LANG}" > "${target}/etc/default/locale"
+(IFS=$'\n'; echo "$LANG"; echo "${locales[*]}") \
+ | uniq | sort > "${target}/etc/locale.gen"
+
+ln -sf /proc/mounts "${target}/etc/mtab"
