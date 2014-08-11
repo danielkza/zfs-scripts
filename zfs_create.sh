@@ -2,6 +2,57 @@
 
 set -e
 
+### Utility functions ###
+
+cmd()
+{
+    echo + "$@"
+    if (( test_only == 0 )); then
+        "$@"
+        return $?
+    else
+        return 0
+    fi
+}
+
+msg()
+{
+    echo 'I:' "$@" >&2
+}
+
+msg_n()
+{
+    echo -n 'I:' "$@" >&2
+}
+
+err()
+{
+    echo 'E: '"$@" >&2
+}
+
+confirm()
+{
+    if (( yes == 1 )); then
+        return 0
+    elif ! [[ -t 1 ]]; then
+        err "confirmation needed but input is not a terminal."
+        return 1
+    else
+        read -p "$1 [y/n] " -r
+        case "$REPLY" in
+            [Yy])
+                return 0
+            ;;
+            [Yy][Ee][Ss])
+                return 0
+        esac
+
+        return 1
+    fi
+}
+
+### Input parameters ###
+
 target_hostname=''
 declare -a hdds
 declare -a ssds
@@ -14,10 +65,12 @@ non_interactive=0
 pool_name=''
 mount_path=''
 
+
 print_help()
 {
+    local program=$(basename "$0")
     cat >&2 <<EOF
-Usage: $0 [-h] -n hostname -d hdd-disk-id [-d ...] -s ssd-disk-id [-s ...]
+Usage: ${program} [-h] -n hostname -d hdd-disk-id [-d ...] -s ssd-disk-id [-s ...]
     -m mount-path [-l zlog-size] [-w swap-size] [-p pool-name] [-T]
 Options:
     -h                
@@ -62,65 +115,6 @@ Options:
 EOF
 }
 
-cmd()
-{
-    echo + "$@"
-    if (( test_only == 0 )); then
-        "$@"
-        return $?
-    else
-        return 0
-    fi
-}
-
-msg()
-{
-    echo >&2
-    echo "$@" >&2
-}
-
-clean_var_name()
-{
-    sed 's/[^[:alnum:]_]/_/g'
-}
-
-find_executable()
-{
-    local name="$(echo "$1" | clean_var_name)"
-    local path=$(which "$1")
-
-    if ! [ -x "$path" ]; then
-        echo "'$1' executable not found in PATH" >&2
-        return 1
-    fi
-        
-    echo "Using ${path} as $1" >&2
-    declare -g "${name}_bin=${path}"
-}
-
-confirm()
-{
-    if (( yes == 1 )); then
-        return 0
-    else
-        read -p "$1 [y/n] " -r
-        case "$REPLY" in
-            [Yy])
-                return 0
-            ;;
-            [Yy][Ee][Ss])
-                return 0
-        esac
-
-        return 1
-    fi
-}
-
-rand_uuid()
-{
-    cat /proc/sys/kernel/random/uuid
-}
-
 while getopts "hn:d:s:m:e:b:w:l:p:ty" opt; do
     case $opt in
     h) print_help; exit 1 ;;
@@ -136,57 +130,79 @@ while getopts "hn:d:s:m:e:b:w:l:p:ty" opt; do
     t) test_only=0 ;;
     y) yes=1 ;;
     \?)
-        echo "Invalid option: -$OPTARG" >&2
+        err "Invalid option: -$OPTARG"
         exit 1
     ;;
     :)
-        echo "Option -$OPTARG requires an argument." >&2
+        err "Option -$OPTARG requires an argument."
         exit 1
     ;;
     esac
 done
 
-if [ -z "$target_hostname" ] || [ -z "$slog_size" ] || [ -z "$swap_size" ] \
-   || [ -z "$boot_size" ] || [ -z "$efi_size" ]
+### Parameter verification ###
+
+if [[ -z "$target_hostname" || -z "$slog_size" || -z "$swap_size" \
+      || -z "$boot_size" || -z "$efi_size" ]]
 then
     print_help
     exit 1
 fi
 
-if [ -z "$pool_name" ]; then
+if [[ -z "$pool_name" ]]; then
     pool_name="${target_hostname%%.*}"
 fi
 
 hdd_count="${#hdds[@]}" 
 ssd_count="${#ssds[@]}"
 
-if (( hdd_count < 2 )) || (( hdd_count % 2 != 0 )); then
-    echo "Invalid HDD count ${hdd_count}: must be multiple of 2, non-zero" >&2
-    exit 1
-fi
-
-if (( ssd_count < 1 )) || (( ssd_count == 1 || ssd_count % 2 != 0 )); then
-    echo "Invalid SSD count ${ssd_count}: must be 1 or a multiple of 2" >&2
+if (( hdd_count < 2 || hdd_count % 2 != 0 )); then
+    err "invalid HDD count ${hdd_count}: must be multiple of 2, non-zero"
     exit 1
 fi
 
 if (( ssd_count == 1 )); then
-    echo "Only one SSD selected. Your boot, swap and SLOG will not be mirrored." >&2
+    err "only one SSD selected. Your boot, swap and SLOG will not be mirrored."
     if ! confirm "Disk failures will cause data and availability loss. Proceed?"; then
         exit 1
     fi
+elif (( ssd_count < 1 || ssd_count % 2 != 0 )); then
+    err "invalid SSD count ${ssd_count}: must be 1 or a multiple of 2"
+    exit 1
 fi
 
+### Check for presence of needed programs ###
+
+clean_var_name()
+{
+    sed 's/[^[:alnum:]_]/_/g'
+}
+
+find_executable()
+{
+    local name="$(echo "$1" | clean_var_name)"
+    local path=$(which "$1")
+
+    if ! [[ -x "$path" ]]; then
+        err "'$1' executable not found in PATH"
+        return 1
+    fi
+        
+    msg "Using ${path} as $1"
+    eval "${name}_bin=${path}"
+}
+
 for exe in hostname \
-           mdadm hdparm sgdisk \
+           mdadm blockdev sgdisk \
            mkfs.vfat mkfs.ext2 mkswap \
            zfs zpool \
            udevadm; do
     find_executable "$exe"
 done
 
+### Update hostname ###
 
-echo "Using hostname '${target_hostname}'" >&2
+msg "Using hostname '${target_hostname}'"
 
 if (( test_only != 0 )); then
     old_hostname=$(hostname)
@@ -194,8 +210,7 @@ if (( test_only != 0 )); then
 fi
 cmd "$hostname_bin" "$target_hostname"
 
-
-echo "Using pool name '${pool_name}'" >&2
+### Check and print disk information ###
 
 check_disks()
 {
@@ -207,32 +222,37 @@ check_disks()
 
     local -A disk_devs
     for disk in "${disks[@]}"; do
-        echo -n "- $disk => "
-        if ! [ -e "${disk}" ]; then
-            echo "NOT FOUND"
+        msg_n "  $disk => "
+        if ! [[ -b "${disk}" ]]; then
+            echo "NOT FOUND" >&2
             exit 1
         fi
 
         dev=$(readlink -f "${disk}")
-        if ! [ -e "${dev}" ]; then
-            echo "NOT FOUND"
+        if ! [[ -b "${dev}" ]]; then
+            echo "NOT FOUND" >&2
             exit 1
         fi
 
-        echo "$dev"
+        echo "$dev" >&2
         eval "${dest_var}[$disk]=\"$dev\""
+
+        "$blockdev_bin" --report "$disk" >&2
+        echo >&2
     done
 }
 
-echo "Using ${hdd_count} HDDs: " >&2
+msg "Using pool name '${pool_name}'"
+
+msg "Using ${hdd_count} HDDs: "
 declare -A hdd_devs
-check_disks "hdd_devs" "${hdds[@]}" >&2
+check_disks "hdd_devs" "${hdds[@]}"
 
-echo >&2
-
-echo "Using ${ssd_count} SSDs: " >&2
+msg "Using ${ssd_count} SSDs: "
 declare -A ssd_devs
-check_disks "ssd_devs" "${ssds[@]}" >&2
+check_disks "ssd_devs" "${ssds[@]}"
+
+### Confirm with user before real actions ###
 
 if (( test_only == 0 )); then
     if ! confirm "Verify all information for correctness. Proceed?"; then
@@ -249,12 +269,16 @@ if (( test_only == 0 )) && cmd "$zpool_bin" list -H -o name "$pool_name" 2>&1 >/
         exit 1
     fi
 
-    msg "* Destroying existing pool" >&2
+    msg "Destroying existing pool" >&2
     cmd "$zpool_bin" destroy "$pool_name" 
 fi
 
+### Partition SSDs ###
 
-msg "* Formatting SSDs" 
+msg "Partitioning SSDs" 
+
+# Guarantee partition alignment
+sgdisk_bin="${sgdisk_bin} -a 2048"
 
 refresh_disk()
 {
@@ -263,15 +287,20 @@ refresh_disk()
     fi
 
     sleep 1
-    cmd "$hdparm_bin" -z "$1"
+    cmd "$blockdev_bin" --rereadpt "$1"
 }
 
-sgdisk_bin="${sgdisk_bin} -a 2048"
-
+# Queue partition creation so it can all be done at once and avoid multiple
+# partition refreshes
 part_queue_start()
 { 
     _part_queue_cmd="$sgdisk_bin '$1'"
     _part_queue_num=0
+}
+
+rand_uuid()
+{
+    cat /proc/sys/kernel/random/uuid
 }
 
 part_queue_add()
@@ -280,6 +309,12 @@ part_queue_add()
     local num=$(( ++_part_queue_num )) uuid=$(rand_uuid)
     local flags=\
 "--new='${num}:0:${size}' -c '${num}:${label}' -t '${num}:${type}' -u '${num}:${uuid}'"
+
+    msg "    partition ${num}"
+    local prop
+    for prop in size label type uuid; do
+        msg "      ${prop} = ${!prop}"
+    done
 
     _part_queue_cmd="${_part_queue_cmd} ${flags}"
     eval "$uuid_var"="$uuid"
@@ -291,12 +326,11 @@ part_queue_apply()
     unset _part_queue_cmd _part_queue_num
 }
 
-efi_uuid=''
-declare -a boot_uuids swap_uuids slog_uuids l2arc_uuids
-
+# Gather up create partitions of each type so they can be mirroed together later
+declare -a efi_uuids boot_uuids swap_uuids slog_uuids l2arc_uuids
 
 for ssd in "${ssds[@]}"; do
-    msg "** Formatting ${ssd}" 
+    msg "  ${ssd}" 
 
     cmd "$zpool_bin" labelclear -f "$ssd"
     refresh_disk "$ssd"
@@ -306,11 +340,8 @@ for ssd in "${ssds[@]}"; do
     
     part_queue_start "$ssd"
 
-    efi_clear_uuid=''
-    if [ -z "$efi_uuid" ]; then
-        part_queue_add "+${efi_size}" EFI ef00 efi_uuid
-        efi_clear_uuid="$efi_uuid"
-    fi
+    part_queue_add "+${efi_size}" "EFI System Partition" ef00 efi_uuid
+    efi_uuids+=("$efi_uuid")
 
     part_queue_add "+${boot_size}" "/boot" 8300 boot_uuid
     boot_uuids+=("$boot_uuid")
@@ -329,69 +360,135 @@ for ssd in "${ssds[@]}"; do
     # Wait for partitions to show up in /dev
     cmd "$udevadm_bin" settle
 
-    for uuid in $boot_uuid $swap_uuid $slog_uuid $l2arc_uuid $efi_clear_uuid; do
+    # Clear any possibly existing ZFS metadata to make sure zpool creation will
+    # succeed later
+    for uuid in $efi_uuid $boot_uuid $swap_uuid $slog_uuid $l2arc_uuid; do
         cmd "$zpool_bin" labelclear -f "/dev/disk/by-partuuid/${uuid}"
     done
 
     refresh_disk "$ssd"
 done
 
+# Wait for partitions again just to be sure
 cmd "$udevadm_bin" settle
 
+# Generate a sequence of partition names, possibly with a prefix and/or
+# interleaved with mirror specifications (for ZFS)
 dev_refs()
 {
-    local var="${1}[@]"
-    local devs=("${!var}") prefix="$2" mirror
-    [ "$3" != "mirror" ] || mirror=1
+    local prefix="$1" mirror="$2"
+    case "$mirror" in
+    mirror)    mirror=1 ;;
+    no-mirror) mirror=0 ;;
+    *) return 1
+    esac
 
-    
-    for (( i = 0; i < ${#devs[@]}; ++i )); do
+    shift 2
+
+    if (( $# < 2 )); then
+        mirror=0
+    fi
+
+    local i=0
+    for dev in "$@"; do
         if (( mirror && i % 2 == 0 )); then
             echo -n "mirror "
         fi
         
-        echo -n "${prefix}${devs[i]} "  
+        echo -n "${prefix}${dev} "
+        (( ++i ))
     done
+
+    return 0
+}
+
+mdadm_create()
+{
+    local name="$1" level="$2"
+    if [[ -z "$name" || -z "$level" ]]; then
+        return 1
+    fi
+
+    shift 2
+    if (( $# < 1 )); then
+        return 2
+    fi
+
+    local dev md_dev="/dev/md/${name}"
+    msg "  create ${md_dev} ${level}"
+    for dev in "$@"; do
+        msg "    using ${dev}"
+    done
+
+    yes | cmd "$mdadm_bin" --create "$md_dev" \
+     --homehost="$target_hostname" \
+     --assume-clean --level="$level" --raid-devices="$#" --metadata=1.0 \
+     "$@" >&2
+
+    local ret=$?
+    if (( ret == 0 )); then
+        eval "${name}_dev"="$md_dev"
+    fi
+
+    return $ret
+}
+
+# Create RAID devices if using more than one SSD
+check_dev_exists()
+{
+    if [[ -z "$1" ]]; then
+        err "Empty device"
+    elif (( test_only == 0 )) && ! [[ -b "$1" ]]; then
+        err "Failed to create or start device '$1'"
+    else
+        return 0
+    fi
+
+    return 1
 }
 
 if (( ssd_count > 1 )); then
-    mdadm_copy_config=1
+    msg "Creating MDADM devices" 
 
-    msg "* Creating MDADM devices" 
+    # Commands set efi_dev, boot_dev and swap_dev
+    mdadm_create efi mirror \
+     $(dev_refs /dev/disk/by-partuuid/ no-mirror "${efi_uuids[@]}")
+    check_dev_exists "$efi_dev"
 
-    boot_dev=/dev/md/boot
-    yes | cmd "$mdadm_bin" --verbose --create "$boot_dev" --homehost="$target_hostname" \
-     --assume-clean --level=mirror --raid-devices="${ssd_count}" --metadata=0.90 \
-     $(dev_refs boot_uuids /dev/disk/by-partuuid/)
+    mdadm_create boot mirror \
+     $(dev_refs /dev/disk/by-partuuid/ no-mirror "${boot_uuids[@]}")
+    check_dev_exists "$boot_dev"
 
-    swap_dev=/dev/md/swap
-    yes | cmd "$mdadm_bin" --verbose --create "$swap_dev" --homehost="$target_hostname" \
-     --assume-clean --level=mirror --raid-devices="${ssd_count}" \
-     $(dev_refs swap_uuids /dev/disk/by-partuuid/)
+    mdadm_create swap mirror \
+     $(dev_refs /dev/disk/by-partuuid/ no-mirror "${swap_uuids[@]}")
+    check_dev_exists "$swap_dev"
+
+    cmd "$udevadm_bin" settle
 else
+    efi_dev="/dev/disk/by-partuuid/${efi_uuids[0]}"
     boot_dev="/dev/disk/by-partuuid/${boot_uuids[0]}"
     swap_dev="/dev/disk/by-partuuid/${swap_uuids[0]}"
 fi
 
+### Create filesystems on SSD ###
 
-msg "* Formatting EFI partition" 
-efi_dev="/dev/disk/by-partuuid/${efi_uuid}"
+msg "Creating filesystems"
+
+msg "  /boot/efi"
 cmd "$mkfs_vfat_bin" -n "EFI System Partition" "$efi_dev"
 
-
-msg "* Formatting boot partition" 
+msg "  /boot"
 cmd "$mkfs_ext2_bin" -L "/boot" "$boot_dev"
 
+msg "  swap"
+cmd "$mkswap_bin" --label "${target_hostname}-swap" "$swap_dev"
 
-msg "* Formatting swap partition" 
+### Prepare HDDs ###
 
-cmd "$mkswap_bin" "$swap_dev"
-
-
-msg "* Clearing HDDs" 
+msg "Clearing HDDs" 
 
 for hdd in "${hdds[@]}"; do
-    msg "** Clearing ${hdd}" 
+    msg "  ${hdd}" 
     
     cmd "$zpool_bin" labelclear -f "$hdd"
     refresh_disk "$hdd"
@@ -400,40 +497,35 @@ for hdd in "${hdds[@]}"; do
     refresh_disk "$hdd"
 done
 
-msg "* Creating pool" 
-
+msg "Creating pool" 
 cmd "$zpool_bin" create -m none -R "$mount_path" -o ashift=12 "$pool_name" \
- $(dev_refs hdds '' mirror)
+ $(dev_refs '' mirror "${hdds[@]}")
 
-
-msg "* Adding SLOG to pool" 
-
+msg "Adding SLOG to pool" 
 cmd "$zpool_bin" add "$pool_name" log \
- $(dev_refs slog_uuids /dev/disk/by-partuuid/ mirror)
+ $(dev_refs /dev/disk/by-partuuid/ mirror "${slog_uuids[@]}")
 
 
-msg "* Adding caches to pool" 
-
+msg "Adding caches to pool" 
 cmd "$zpool_bin" add "$pool_name" cache \
- $(dev_refs l2arc_uuids /dev/disk/by-partuuid/)
+ $(dev_refs /dev/disk/by-partuuid/ no-mirror "${l2arc_uuids[@]}")
 
+zpool_create()
+{
+    local fs="${pool_name}/$1"
+    msg "  ${fs}" >&2
+    cmd "$zfs_bin" create "$fs" -o mountpoint="$2"
+}
 
-msg "* Creating ZFS filesystems" 
+msg "Creating ZFS filesystems on ${pool_name}"
+zpool_create "root" none
+zpool_create "root/debian" /
 
-cmd "$zfs_bin" create "${pool_name}/root" -o mountpoint=none
-cmd "$zfs_bin" create "${pool_name}/root/debian" -o mountpoint=/
+zpool_set()
+{
+    msg "  $1 = $2" >&2
+    cmd "$zpool_bin" set "$1"="$2" "$pool_name"
+}
 
-
-msg "* Setting ZFS pool options" 
-
-cmd "$zpool_bin" set bootfs="${pool_name}/root/debian" "$pool_name"
-cmd mkdir -p "${mount_path}/etc/zfs"
-cmd "$zpool_bin" set cachefile="${mount_path}/etc/zfs/zpool.cache" "$pool_name"
-
-
-if (( mdadm_copy_config )); then
-    msg "* Copying MDADM configuration to target"     
-
-    cmd mkdir -p "${mount_path}/etc/mdadm"
-    cmd sh -c "${mdadm_bin} --examine --scan > '${mount_path}/etc/mdadm/mdadm.conf'"
-fi
+msg "Setting ZFS pool options on ${pool_name}" 
+zpool_set bootfs "${pool_name}/root/debian"
