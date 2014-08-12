@@ -2,23 +2,24 @@
 
 set -e
 
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 target_path"
-    exit 1
-fi
-
 target="$1"
 
-if [ -z "$target" ] || ! [ -d "$target" ]; then
-    echo "Invalid target dir '$target'"
+if [[ -z "$target" ]]; then
+    program=$(basename "$0")
+    echo "Usage: ${program} target_path"
     exit 1
 fi
 
-src_dir="$(dirname "{BASH_SOURCE[0]}")"
+if ! [[ -d "$target" ]]; then
+    echo "Invalid target dir '${target}'"
+    exit 1
+fi
+
+src_dir=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
 post_strap="${src_dir}/post_debootstrap.sh"
 zfs_prereqs="${src_dir}/zfs_prerequisites.sh"
 
-if ! [ -f "$post_strap" ] || ! [ -f "$zfs_prereqs" ]; then
+if ! [[ -f "$post_strap" && -f "$zfs_prereqs" ]]; then
     echo "Missing scripts"
     exit 1
 fi

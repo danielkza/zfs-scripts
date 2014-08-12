@@ -1,28 +1,52 @@
 #!/bin/bash
 
 set -e
-cd /root
 
-src_dir=$(readlink -f "$(dirname "{BASH_SOURCE[0]}")")
+APT_GET_INSTALL='apt-get install -y --no-install-suggests'
+
+err()
+{
+    echo 'Error:' "$@" >&2
+}
+
+###
+
+src_dir=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
 zfs_prereqs="${src_dir}/zfs_prerequisites.sh"
-if ! [ -x "$zfs_prereqs" ]; then
-    echo "Missing prerequisites script"
+
+if ! [[ -x "$zfs_prereqs" ]]; then
+    err "Missing prerequisites script"
     exit 1
 fi
 
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 pool_name [mirror]"
+os_codename=$(lsb_release -s -c)
+
+case "$os_codename" in
+wheezy|jessie) debian=1 ;;
+trusty) ubuntu=1 ;;
+*)
+    err "Unknown OS codename '${os_codename}'"
+    exit 1
+esac
+
+print_help()
+{
+    program=$(basename "$0")
+    echo "Usage: ${program} [pool_name]" >&2    
+}
+
+if [[ "$1" == -h* ]]; then
+    print_help
     exit 1
 fi
 
 pool_name="$1"
-if [ -z "$pool_name" ]; then
-    echo "Invalid pool name"
-    exit 1
-fi
 
-mirror="$2"
-[ -n "$mirror" ] || mirror='http://debian.c3sl.ufpr.br/debian'
+###
+
+old_hostname=$(hostname)
+hostname "$(cat /etc/hostname)"
+trap "hostname '${old_hostname}'" EXIT
 
 ###
 
@@ -32,61 +56,50 @@ mkdir -p /boot
 mkdir -p /boot/efi
 (mount | grep -q '/boot/efi ') || mount /boot/efi
 
-export LANG=en_US.UTF-8
+[[ -n "$LANG" ]] || export LANG=en_US.UTF-8
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y locales
 
-sed_uncomment() {
-    local search="$1"; shift
-    sed -e "$search"'s/^# *//' "$@" 
-}
-
-sed_uncomment "/${LANG}/" -i /etc/locale.gen
+$APT_GET_INSTALL -y locales
+locale-gen en_US.UTF-8 UTF-8
 locale-gen
 
-# Fix base repos
+if [[ "$os_codename" == "wheezy" ]]; then
+    # Install kernels before ZFS so module is correctly built
+    $APT_GET_INSTALL linux-{image,headers}-amd64
 
-sed -i -e 's/main$/main contrib non-free/' \
- -e "s#http://http\.debian\.net/debian#${mirror}#" /etc/apt/sources.list
-
-# Add backports if needed
-if ! [ -f /etc/apt/sources.list.d/wheezy-backports.list ]; then
-    cat > /etc/apt/sources.list.d/wheezy-backports.list <<EOF
-deb ${mirror} wheezy-backports main contrib non-free
-deb-src ${mirror} wheezy-backports main contrib non-free
-EOF
+    # Needed by 3.14
+    $APT_GET_INSTALL perl-modules
+    $APT_GET_INSTALL -t wheezy-backports linux-{image,headers}-amd64
 fi
-
-apt-get update
-
-# Make sure mdadm.conf is used
-
-# Install kernels before ZFS so module is correctly built
-apt-get install -y linux-{image,headers}-amd64
-
-# Needed by 3.14
-apt-get install -y perl-modules
-apt-get install -t wheezy-backports -y linux-{image,headers}-amd64
 
 if ! "$zfs_prereqs"; then
     echo "ZFS prereqs failed"
     exit 1
 fi
 
-if [ -f /etc/mdadm/mdadm.conf ] && [ -f /var/lib/mdadm/CONF-UNCHECKED ]; then
-    rm -f /var/lib/mdadm/CONF-UNCHECKED
+# Autodetect pool if needed
+if [[ -z "$pool_name" ]]; then
+    zpool list -H -o name 2>/dev/null | read -ra zpools
+
+    if (( ${#zpools[@]} > 1 )); then
+        err "more than one zpool mounted, specify which to use manually" >&2
+        exit 1
+    fi
+
+    pool_name="${zpools[0]}"
 fi
-
-# Install base packages
-
-tasksel install standard ssh-server
-apt-get install -y vim
 
 # Install GRUB
 
-apt-get install -y grub-efi-amd64 zfs-initramfs
+$APT_GET_INSTALL grub-efi-amd64 zfs-initramfs
+
+# Make sure mdadm configuration is used
+
+if [ -f /etc/mdadm/mdadm.conf ] && [ -f /var/lib/mdadm/CONF-UNCHECKED ]; then
+    rm -f /var/lib/mdadm/CONF-UNCHECKED
+fi
 
 # Update grub configuration
 
@@ -100,32 +113,41 @@ unquote() {
 
 cmdline=$(grep '^GRUB_CMDLINE_LINUX=' /etc/default/grub | head -n1 | extract_value)
 
-if [ $? -ne 0 ]; then
-    echo "Failed to parse cmdline from /etc/default/grub"
+if (( $? != 0 )); then
+    err "Failed to parse cmdline from /etc/default/grub"
     exit 1
 fi
 
 cmdline=$(echo "$cmdline" | unquote)
 old_cmdline="$cmdline"
 
-if [[ $cmdline != *bootfs=* ]]; then
+if [[ "$cmdline" != *bootfs=* ]]; then
     bootfs=$(zpool get bootfs "${pool_name}" | tail -n1 | awk '{ print $3 }')
-    if [ $? -ne 0 ]; then
-        echo "Failed to read bootfs from zpool"
+    if (( $? != 0 )); then
+        err "Failed to read bootfs from zpool"
         exit 1
     fi
 
     cmdline="rpool=${pool_name} bootfs=${bootfs} ${cmdline}"
 fi
 
-if [[ $cmdline != *boot=zfs* ]]; then
+if [[ "$cmdline" != *boot=zfs* ]]; then
     cmdline="boot=zfs ${cmdline}"
 fi
 
-if [ "$cmdline" != "$old_cmdline" ]; then
+if [[ "$cmdline" != "$old_cmdline" ]]; then
     cmdline="GRUB_CMDLINE_LINUX=\"${cmdline}\""
     sed -i -e "s#^GRUB_CMDLINE_LINUX=.*#${cmdline}#" /etc/default/grub
 fi
 
 grub-install --target=x86_64-efi --efi-directory=/boot/efi
 update-grub
+
+# Install base packages
+
+tasksel install standard ssh-server
+apt-get install -y vim
+
+# Just to be sure
+
+update-initramfs -u -k all

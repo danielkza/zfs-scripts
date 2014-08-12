@@ -4,11 +4,13 @@ set -e
 
 # Add ZFS repo
 
+APT_GET_INSTALL='apt-get install -y --no-install-suggests'
+
 os_codename=$(lsb_release -s -c)
 
 case "$os_codename" in
-wheezy) ;;
-trusty) ;;
+wheezy|jessie) debian=1 ;;
+trusty) ubuntu=1 ;;
 *)
     echo "Error: Unsupported OS codename ${release}" >&2
     exit 1
@@ -18,42 +20,47 @@ mirror="$1"
 
 export DEBIAN_FRONTEND=noninteractive
 
-case "$os_codename" in)
-wheezy)
+if (( debian )); then
     if [[ -z "$mirror" ]]; then
         mirror='http://cdn.debian.net/debian'
     fi
 
-    wget -N 'http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2%7Ewheezy_all.deb' \
-     -O /tmp/zfsonlinux.deb
+    zfs_url=\
+"http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2~${os_codename}_all.deb"
+
+    wget "$zfs_url" -O /tmp/zfsonlinux.deb
     dpkg -i /tmp/zfsonlinux.deb
     
-    # Add backports for udev
-    if ! [ -f /etc/apt/sources.list.d/wheezy-backports.list ]; then
-        cat > /etc/apt/sources.list.d/wheezy-backports.list <<EOF
+    # Add backports for udev to fix /dev/disk/by-partuuid
+    if [[ "$os_codename" == "wheezy" ]]; then
+        backports_list="/etc/apt/sources.list.d/wheezy-backports.list"
+        if ! [ -f "$backports_list" ]; then
+            cat > "$backports_list" <<EOF
 deb ${mirror} wheezy-backports main contrib non-free
 deb-src ${mirror} wheezy-backports main contrib non-free
 EOF
     fi
+        apt-get update
+        $APT_GET_INSTALL -t wheezy-backports udev
 
+        udevadm trigger
+        udevadm settle
+    fi
+elif (( ubuntu )); then
     apt-get update
-    apt-get install -y -t wheezy-backports udev
+    $APT_GET_INSTALL software-properties-common
 
-    udevadm trigger
-    udevadm settle
-;;
-trusty)
     apt-add-repository -y ppa:zfs-native/stable
     apt-get update
-esac
+fi
 
-apt-get install -y linux-{image,headers}-amd64 \
- mdadm gdisk dosfstools e2fsprogs
+$APT_GET_INSTALL mdadm gdisk dosfstools e2fsprogs
 
-case "$os_release" in
-wheezy) apt-get install -y debian-zfs ;;
-trusty) apt-get install -y ubuntu-zfs ;;
-esac
+if (( debian )); then
+    $APT_GET_INSTALL linux-{image,headers}-amd64 debian-zfs
+elif (( ubuntu )); then
+    $APT_GET_INSTALL spl-dkms zfs-dkms linux-{image,headers}-generic ubuntu-zfs
+fi
 
 # Check ZFS
 
