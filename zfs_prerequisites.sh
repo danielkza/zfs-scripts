@@ -52,12 +52,12 @@ elif (( ubuntu )); then
     # Ubuntu packages.
 
     zfs_url=\
-"http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2~wheezy_all.deb"
+'http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2~wheezy_all.deb'
 
     wget "$zfs_url" -O /tmp/zfsonlinux.deb
     dpkg -i /tmp/zfsonlinux.deb
 
-    cat > '/etc/apt/preferences.d/pin-zfsonlinux' <<EOF
+    cat > /etc/apt/preferences.d/pin-zfsonlinux <<EOF
 Package: *
 Pin: release o=archive.zfsonlinux.org
 Pin-Priority: 450
