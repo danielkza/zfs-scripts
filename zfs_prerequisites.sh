@@ -4,7 +4,7 @@ set -e
 
 # Add ZFS repo
 
-APT_GET_INSTALL='apt-get install -y --no-install-suggests'
+APT_GET_INSTALL='apt-get install -y --no-install-suggests --no-install-recommends'
 
 os_codename=$(lsb_release -s -c)
 
