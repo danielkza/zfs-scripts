@@ -2,7 +2,7 @@
 
 set -e
 
-APT_GET_INSTALL='apt-get install -y --no-install-suggests'
+APT_GET_INSTALL='apt-get install -y --no-install-recommends --no-install-suggests'
 
 err()
 {
@@ -62,8 +62,12 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 
 $APT_GET_INSTALL -y locales
-locale-gen en_US.UTF-8 UTF-8
-locale-gen
+
+if (( ubuntu )); then
+    locale-gen en_US.UTF-8
+else
+    locale-gen
+fi
 
 if [[ "$os_codename" == "wheezy" ]]; then
     # Install kernels before ZFS so module is correctly built
@@ -103,42 +107,58 @@ fi
 
 # Update grub configuration
 
-extract_value() {
+shell_var_replace()
+{
+    local option="$1" value="$2" file="$3"
+    sed -i -e \
+"s|^\\([[:blank:]]*\\)${option}=.*|"\
+"\\1${option}=\"${value}\"|;"\
+"t; q 1" \
+     "$file"
+}
+
+shell_var_set()
+{
+    local option="$1" value="$2" file="$3"
+    if ! shell_var_replace "$option" "$value" "$file"; then
+        echo "${option}=\"$value\"" >> "$file"
+    fi
+}
+
+shell_var_split_value()
+{
     sed -e 's/^[^=]*=//' 
 }
 
-unquote() {
-    sed -e 's/^"//' -e 's/"$//'
+unquote()
+{
+    sed -e $'s/^["\']//' -e $'s/["\']$//'
 }
 
-cmdline=$(grep '^GRUB_CMDLINE_LINUX=' /etc/default/grub | head -n1 | extract_value)
+shell_var_get()
+{
+    local option="$1" file="$2"
+    grep "^[[:blank:]]*${option}=" "$file" | head -n1 | env_line_split_value | unquote
+}
 
-if (( $? != 0 )); then
-    err "Failed to parse cmdline from /etc/default/grub"
+grub_def="/etc/default/grub"
+
+if ! cmdline=$(shell_var_get GRUB_CMDLINE_LINUX "$grub_def"); then
+    err "Failed to parse cmdline from ${grub_def}"
     exit 1
 fi
 
-cmdline=$(echo "$cmdline" | unquote)
 old_cmdline="$cmdline"
-
-if [[ "$cmdline" != *bootfs=* ]]; then
-    bootfs=$(zpool get bootfs "${pool_name}" | tail -n1 | awk '{ print $3 }')
-    if (( $? != 0 )); then
-        err "Failed to read bootfs from zpool"
-        exit 1
-    fi
-
-    cmdline="rpool=${pool_name} bootfs=${bootfs} ${cmdline}"
-fi
 
 if [[ "$cmdline" != *boot=zfs* ]]; then
     cmdline="boot=zfs ${cmdline}"
+    shell_var_set GRUB_CMDLINE_LINUX "${cmdline}"  "$grub_def"
 fi
 
-if [[ "$cmdline" != "$old_cmdline" ]]; then
-    cmdline="GRUB_CMDLINE_LINUX=\"${cmdline}\""
-    sed -i -e "s#^GRUB_CMDLINE_LINUX=.*#${cmdline}#" /etc/default/grub
-fi
+shell_var_set GRUB_HIDDEN_TIMEOUT '' "$grub_def"
+shell_var_set GRUB_TIMEOUT 10 "$grub_def"
+shell_var_set GRUB_DISABLE_LINUX_UUID true "$grub_def"
+shell_var_replace quick_boot 0 /etc/grub.d/00_header
 
 grub-install --target=x86_64-efi --efi-directory=/boot/efi
 update-grub

@@ -4,7 +4,7 @@ set -e
 
 # Add ZFS repo
 
-APT_GET_INSTALL='apt-get install -y --no-install-suggests'
+APT_GET_INSTALL='apt-get install -y --no-install-recommends --no-install-suggests'
 
 os_codename=$(lsb_release -s -c)
 
@@ -47,6 +47,25 @@ EOF
         udevadm settle
     fi
 elif (( ubuntu )); then
+    # We need the grub and zfs-initramfs packages from Wheezy, at least for now.
+    # But pin everything we don't need away so it doesn't interfere with the 
+    # Ubuntu packages.
+
+    zfs_url=\
+"http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_2~wheezy_all.deb"
+
+    wget "$zfs_url" -O /tmp/zfsonlinux.deb
+    dpkg -i /tmp/zfsonlinux.deb
+
+    cat > '/etc/apt/preferences.d/pin-zfsonlinux' <<EOF
+Package: *
+Pin: release o=archive.zfsonlinux.org
+Pin-Priority: 450
+
+Package: *grub* zfs-initramfs
+Pin: release o=archive.zfsonlinux.org
+Pin-Priority: 1002
+EOF
     apt-get update
     $APT_GET_INSTALL software-properties-common
 
@@ -54,12 +73,14 @@ elif (( ubuntu )); then
     apt-get update
 fi
 
+# Install tools
 $APT_GET_INSTALL mdadm gdisk dosfstools e2fsprogs
 
+# Install kernel and ZFS
 if (( debian )); then
     $APT_GET_INSTALL linux-{image,headers}-amd64 debian-zfs
 elif (( ubuntu )); then
-    $APT_GET_INSTALL spl-dkms zfs-dkms linux-{image,headers}-generic ubuntu-zfs
+    $APT_GET_INSTALL linux-{image,headers}-generic spl-dkms zfs-dkms ubuntu-zfs
 fi
 
 # Check ZFS

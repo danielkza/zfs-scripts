@@ -54,30 +54,35 @@ confirm()
 ### Input parameters ###
 
 target_hostname=''
+mount_path=''
 declare -a hdds
 declare -a ssds
-zlog_hsize='1024M'
-swap_size='1024M'
-boot_size='256M'
 efi_size='256M'
+boot_size='256M'
+swap_size='1024M'
+slog_size='1024M'
+pool_name=''
+fs_name='debian'
 test_only=1
 non_interactive=0
-pool_name=''
-mount_path=''
 
 
 print_help()
 {
     local program=$(basename "$0")
     cat >&2 <<EOF
-Usage: ${program} [-h] -n hostname -d hdd-disk-id [-d ...] -s ssd-disk-id [-s ...]
-    -m mount-path [-l zlog-size] [-w swap-size] [-p pool-name] [-T]
+Usage: ${program} [-h] -n hostname -m mount-path
+    -d hdd-disk-path [-d ...] -s ssd-disk-path [-s ...]
+    [OPTIONS]
 Options:
     -h                
                       Print help and exit
     -n hostname       
                       Specify the hostname to use temporarily. Will possibly be
-                      used to generate the hostid by ZFS
+                      used to generate the hostid by ZFS.
+    -m mount-path
+                      Where to mount the root FS created from the pool after
+                      everything is done.
     -d hdd-disk-path    
                       Specify the path to a disk to include in the main storage
                       pool. Should be something that exists in /dev/disk/by-id,
@@ -86,48 +91,60 @@ Options:
     -s ssd-disk-path    
                       Specify the path to a disk to use as utility, ZFS SLOG and
                       cache disks. Should be an SSD. Repeat for multiple disks.
-                      Number of disks must be 1 or a multiple of two
-    -m mount-path
-                      Where to mount the root FS created from the pool after
-                      everything is done.
+                      Number of disks must be 1 or a multiple of two.
     -e efi-size
-                      Size of the EFI partition on the first SSD.
-                      Defaults to ${efi_size}. Should be specified in units of
-                      'M' for MiB.
+                      Size of the EFI partition. Will be mirrored on all
+                      available SSDs. Specify as a number immediately followed
+                      by a one letter unit (K, M, G, etc), or as any other form
+                      accepted by the sgdisk program.
+                      Defaults to ${efi_size}.
     -b boot-size
-                      Size of the boot partitions. Will be mirrored on
-                      all provided SSDs. Defaults to ${boot_size}.
+                      Size of the boot partitions. Will be mirrored on all
+                      available SSDs.
+                      Defaults to ${boot_size}.
     -w swap-size      
-                      Size of the swap partitions. Will be mirrored on
-                      all provided SSDs. Defaults to ${swap_size}.
-    -l zlog-size      
-                      Size of the ZFS SLOG partitions. Will be mirrored
-                      on all provided SSDs. Defaults to ${slogsize}.
+                      Size of the swap partitions. Will be mirrored on all
+                      available SSDs.
+                      Defaults to ${swap_size}.
+    -l slog-size      
+                      Size of the ZFS SLOG partitions. Will be mirrored on all
+                      available SSDs.
+                      Defaults to ${slog_size}.
     -p pool-name
                       Use an specific pool name instead of defaulting to the
-                      host name (without domain)
-    -t
+                      host name (without domain).
+    -f fs-name
+                      Use an specific name for the root FS, which is appended to
+                      <pool-name>/root/ to form the complete name. Defaults
+                      to '${fs_name}'.
+    -T
                       Actually perform all the actions instead of doing a
                       dry-run as per default. Will ask you to confirm setup
-                    before proceding
+                      before proceding.
     -y
-                      Answer yes to all prompts by default (be careful!)
+                      Answer yes to all prompts by default (be careful!).
 EOF
 }
 
-while getopts "hn:d:s:m:e:b:w:l:p:ty" opt; do
+if [[ "$1" == --help* ]]; then
+    print_help
+    exit 1
+fi
+
+while getopts "hn:m:d:s:e:b:w:l:p:f:Ty" opt; do
     case $opt in
     h) print_help; exit 1 ;;
     n) target_hostname="$OPTARG" ;;
+    m) mount_path="$OPTARG" ;;
     d) hdds+=("$OPTARG") ;;
     s) ssds+=("$OPTARG") ;;
-    m) mount_path="$OPTARG" ;;
-    l) slog_size="$OPTARG" ;;
-    w) swap_size="$OPTARG" ;;
-    b) boot_size="$OPTARG" ;;
     e) efi_size="$OPTARG" ;;
+    b) boot_size="$OPTARG" ;;
+    w) swap_size="$OPTARG" ;;
+    l) slog_size="$OPTARG" ;;
     p) pool_name="$OPTARG" ;;
-    t) test_only=0 ;;
+    f) fs_name="$OPTARG" ;;
+    T) test_only=0 ;;
     y) yes=1 ;;
     \?)
         err "Invalid option: -$OPTARG"
@@ -142,8 +159,9 @@ done
 
 ### Parameter verification ###
 
-if [[ -z "$target_hostname" || -z "$slog_size" || -z "$swap_size" \
-      || -z "$boot_size" || -z "$efi_size" ]]
+if [[ -z "$target_hostname" || -z "$mount_path" || -z "$efi_size" \
+     || -z "$boot_size" || -z "$swap_size" || -z "$slog_size" \
+     || -z "$fs_name" ]]
 then
     print_help
     exit 1
@@ -168,6 +186,21 @@ if (( ssd_count == 1 )); then
     fi
 elif (( ssd_count < 1 || ssd_count % 2 != 0 )); then
     err "invalid SSD count ${ssd_count}: must be 1 or a multiple of 2"
+    exit 1
+fi
+
+### Check mount path ###
+
+if ! [[ -e "$mount_path" ]]; then
+    if ! confirm "mount path does not exist. Create it?"
+        exit 1
+    fi
+
+    cmd mkdir -p "$mount_path"
+fi
+
+if ! [[ -d "$mount_path" ]]; then
+    err "Mount path '${mount_path}' is not a valid directory."
     exit 1
 fi
 
@@ -519,7 +552,7 @@ zpool_create()
 
 msg "Creating ZFS filesystems on ${pool_name}"
 zpool_create "root" none
-zpool_create "root/debian" /
+zpool_create "root/${fs_name}" /
 
 zpool_set()
 {
@@ -528,4 +561,4 @@ zpool_set()
 }
 
 msg "Setting ZFS pool options on ${pool_name}" 
-zpool_set bootfs "${pool_name}/root/debian"
+zpool_set bootfs "${pool_name}/root/${fs_name}""
