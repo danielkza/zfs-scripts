@@ -2,7 +2,7 @@
 
 set -e
 
-APT_GET_INSTALL='apt-get install -y --no-install-recommends --no-install-suggests'
+APT_GET_INSTALL='apt-get install -y --no-install-suggests'
 
 err()
 {

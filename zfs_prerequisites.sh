@@ -4,7 +4,7 @@ set -e
 
 # Add ZFS repo
 
-APT_GET_INSTALL='apt-get install -y --no-install-recommends --no-install-suggests'
+APT_GET_INSTALL='apt-get install -y --no-install-suggests'
 
 os_codename=$(lsb_release -s -c)
 
@@ -19,6 +19,9 @@ esac
 mirror="$1"
 
 export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+$APT_GET_INSTALL wget
 
 if (( debian )); then
     if [[ -z "$mirror" ]]; then
