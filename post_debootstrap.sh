@@ -125,7 +125,7 @@ shell_var_set()
     fi
 }
 
-shell_var_split_value()
+shell_line_split_value()
 {
     sed -e 's/^[^=]*=//' 
 }
@@ -141,7 +141,7 @@ shell_var_get()
     grep "^[[:blank:]]*${option}=" "$file" | head -n1 | env_line_split_value | unquote
 }
 
-grub_def="/etc/default/grub"
+grub_def=/etc/default/grub
 
 if ! cmdline=$(shell_var_get GRUB_CMDLINE_LINUX "$grub_def"); then
     err "Failed to parse cmdline from ${grub_def}"
@@ -158,7 +158,7 @@ fi
 shell_var_set GRUB_HIDDEN_TIMEOUT '' "$grub_def"
 shell_var_set GRUB_TIMEOUT 10 "$grub_def"
 shell_var_set GRUB_DISABLE_LINUX_UUID true "$grub_def"
-shell_var_replace quick_boot 0 /etc/grub.d/00_header
+#shell_var_replace quick_boot 0 /etc/grub.d/00_header
 
 grub-install --target=x86_64-efi --efi-directory=/boot/efi
 update-grub
