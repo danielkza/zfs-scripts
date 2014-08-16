@@ -18,7 +18,7 @@ get_uuid()
 export LANG=en_US.UTF-8
 unset "${!LC_@}"
 
-"${src_dir}/${hostname}_create.sh" -t
+"${src_dir}/${hostname}_create.sh" -T
 
 efi_uuid=$(get_uuid -t LABEL="EFI System")
 boot_uuid=$(get_uuid -t LABEL=/boot)
