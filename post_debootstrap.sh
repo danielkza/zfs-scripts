@@ -165,6 +165,7 @@ update-grub
 
 # Install base packages
 
+$APT_GET_INSTALL tasksel
 tasksel install standard ssh-server
 apt-get install -y vim
 

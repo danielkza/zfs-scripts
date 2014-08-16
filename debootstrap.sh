@@ -4,7 +4,8 @@ set -e
 
 DEFAULT_PACKAGES=(locales
  ifupdown netbase net-tools iproute isc-dhcp-client
- openssh-server vim)
+ openssh-server vim
+ aptitude)
 
 ###
 
