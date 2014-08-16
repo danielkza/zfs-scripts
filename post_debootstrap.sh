@@ -138,7 +138,7 @@ unquote()
 shell_var_get()
 {
     local option="$1" file="$2"
-    grep "^[[:blank:]]*${option}=" "$file" | head -n1 | env_line_split_value | unquote
+    grep "^[[:blank:]]*${option}=" "$file" | head -n1 | shell_line_split_value | unquote
 }
 
 grub_def=/etc/default/grub
