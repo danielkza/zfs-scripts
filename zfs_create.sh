@@ -192,7 +192,7 @@ fi
 ### Check mount path ###
 
 if ! [[ -e "$mount_path" ]]; then
-    if ! confirm "mount path does not exist. Create it?"
+    if ! confirm "mount path does not exist. Create it?"; then
         exit 1
     fi
 
