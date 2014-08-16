@@ -561,4 +561,4 @@ zpool_set()
 }
 
 msg "Setting ZFS pool options on ${pool_name}" 
-zpool_set bootfs "${pool_name}/root/${fs_name}""
+zpool_set bootfs "${pool_name}/root/${fs_name}"
