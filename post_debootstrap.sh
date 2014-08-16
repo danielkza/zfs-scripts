@@ -101,65 +101,11 @@ $APT_GET_INSTALL grub-efi-amd64 zfs-initramfs
 
 # Make sure mdadm configuration is used
 
-if [ -f /etc/mdadm/mdadm.conf ] && [ -f /var/lib/mdadm/CONF-UNCHECKED ]; then
+if [[ -f /etc/mdadm/mdadm.conf && -f /var/lib/mdadm/CONF-UNCHECKED ]]; then
     rm -f /var/lib/mdadm/CONF-UNCHECKED
 fi
 
-# Update grub configuration
-
-shell_var_replace()
-{
-    local option="$1" value="$2" file="$3"
-    local search_re="^\\([[:blank:]]*\\)${option}=.*"
-    if ! grep -q "$search_re" "$file"; then
-        return 1
-    fi
-
-    sed -i -e "s|${search_re}|\\1${option}=\"${value}\"|" "$file"
-}
-
-shell_var_set()
-{
-    local option="$1" value="$2" file="$3"
-    if ! shell_var_replace "$option" "$value" "$file"; then
-        echo "${option}=\"${value}\"" >> "$file"
-    fi
-}
-
-shell_line_split_value()
-{
-    sed -e 's/^[^=]*=//' 
-}
-
-unquote()
-{
-    sed -e $'s/^["\']//' -e $'s/["\']$//'
-}
-
-shell_var_get()
-{
-    local option="$1" file="$2"
-    grep "^[[:blank:]]*${option}=" "$file" | head -n1 | shell_line_split_value | unquote
-}
-
-grub_def=/etc/default/grub
-
-if ! cmdline=$(shell_var_get GRUB_CMDLINE_LINUX "$grub_def"); then
-    err "Failed to parse cmdline from ${grub_def}"
-    exit 1
-fi
-
-old_cmdline="$cmdline"
-
-if [[ "$cmdline" != *boot=zfs* ]]; then
-    cmdline="boot=zfs ${cmdline}"
-    shell_var_set GRUB_CMDLINE_LINUX "${cmdline}"  "$grub_def"
-fi
-
-shell_var_set GRUB_HIDDEN_TIMEOUT '' "$grub_def"
-shell_var_set GRUB_TIMEOUT 10 "$grub_def"
-shell_var_set GRUB_DISABLE_LINUX_UUID true "$grub_def"
-#shell_var_replace quick_boot 0 /etc/grub.d/00_header
+# GRUB
 
 grub-install --target=x86_64-efi --efi-directory=/boot/efi
 update-grub
@@ -167,9 +113,6 @@ update-grub
 # Install base packages
 
 $APT_GET_INSTALL tasksel
-tasksel install standard
-apt-get install -y vim
-
-# Just to be sure
-
-update-initramfs -u -k all
+for task in standard ssh-server; do
+    tasksel install "$task"
+done
