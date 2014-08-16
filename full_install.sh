@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
 src_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 
 hostname="$1"
-if [ -z "$hostname" ]; then
+if [[ -z "$hostname" ]]; then
     echo "Invalid hostname" >&2
     exit 1
 fi
