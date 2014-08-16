@@ -90,10 +90,13 @@ fi
 
 # Check ZFS
 
-modprobe zfs
-if dmesg | grep -q 'ZFS:'; then
-    echo 'ZFS OK.'
-else
-    echo 'ZFS module not running, check errors.'
-    exit 1
+if ! lsmod | grep -q '^zfs'; then
+    modprobe zfs
+
+    if ! dmesg | grep -q 'ZFS:'; then
+        echo 'ZFS module not running, check errors.' >&2
+        exit 1
+    fi
 fi
+
+echo 'ZFS OK.'
