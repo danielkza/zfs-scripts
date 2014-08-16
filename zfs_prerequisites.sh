@@ -78,9 +78,11 @@ $APT_GET_INSTALL mdadm gdisk dosfstools e2fsprogs
 
 # Install kernel and ZFS
 if (( debian )); then
-    $APT_GET_INSTALL linux-{image,headers}-amd64 debian-zfs
+    $APT_GET_INSTALL linux-{image,headers}-amd64
+    $APT_GET_INSTALL debian-zfs
 elif (( ubuntu )); then
-    $APT_GET_INSTALL linux-{image,headers}-generic spl-dkms zfs-dkms ubuntu-zfs
+    $APT_GET_INSTALL linux-{image,headers}-generic
+    $APT_GET_INSTALL ubuntu-zfs
 fi
 
 # Check ZFS
