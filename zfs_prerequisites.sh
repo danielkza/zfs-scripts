@@ -12,7 +12,7 @@ case "$os_codename" in
 wheezy|jessie) debian=1 ;;
 trusty) ubuntu=1 ;;
 *)
-    echo "Error: Unsupported OS codename ${release}" >&2
+    echo "Error: Unsupported OS codename ${os_codename}" >&2
     exit 1
 esac 
 
