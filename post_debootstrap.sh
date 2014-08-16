@@ -110,18 +110,19 @@ fi
 shell_var_replace()
 {
     local option="$1" value="$2" file="$3"
-    sed -i -e \
-"s|^\\([[:blank:]]*\\)${option}=.*|"\
-"\\1${option}=\"${value}\"|;"\
-"t; q 1" \
-     "$file"
+    local search_re="^\\([[:blank:]]*\\)${option}=.*"
+    if ! grep -q "$search_re" "$file"; then
+        return 1
+    fi
+
+    sed -i -e "s|${search_re}|\\1${option}=\"${value}\"|" "$file"
 }
 
 shell_var_set()
 {
     local option="$1" value="$2" file="$3"
     if ! shell_var_replace "$option" "$value" "$file"; then
-        echo "${option}=\"$value\"" >> "$file"
+        echo "${option}=\"${value}\"" >> "$file"
     fi
 }
 
@@ -166,7 +167,7 @@ update-grub
 # Install base packages
 
 $APT_GET_INSTALL tasksel
-tasksel install standard ssh-server
+tasksel install standard
 apt-get install -y vim
 
 # Just to be sure
