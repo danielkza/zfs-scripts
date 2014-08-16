@@ -232,8 +232,8 @@ elif (( ubuntu )); then
 deb ${mirror} ${suite} main restricted
 deb-src ${mirror} ${suite} main restricted
 
-deb http://security.ubuntu.com/ubuntu/ ${suite}-security main restricted
-deb-src http://security.ubuntu.com/ubuntu/ ${suite}-security main restricted
+deb ${mirror} ${suite}-security main restricted
+deb-src ${mirror} ${suite}-security main restricted
 
 deb ${mirror} ${suite}-updates main restricted
 deb-src ${mirror} ${suite}-updates main restricted
