@@ -216,29 +216,34 @@ sources_list="${target}/etc/apt/sources.list"
 sources_list_d="${sources_list}.d"
 
 if (( debian )); then
+    components="main contrib non-free"
+
     cat > "$sources_list" <<EOF
-deb ${mirror} ${suite} main contrib non-free
-deb-src ${mirror} ${suite} main contrib non-free
+deb ${mirror} ${suite} ${components}
+deb-src ${mirror} ${suite} ${components}
 
-deb http://security.debian.org/ ${suite}/updates main
-deb-src http://security.debian.org/ ${suite}/updates main
+deb http://security.debian.org/ ${suite}/updates ${components}
+deb-src http://security.debian.org/ ${suite}/updates ${components}
 EOF
-
     cat > "${sources_list_d}/${suite}-backports.list" <<EOF
-deb ${mirror} ${suite}-backports main contrib non-free
-deb-src ${mirror} ${suite}-backports main contrib non-free
+deb ${mirror} ${suite}-backports ${components}
+deb-src ${mirror} ${suite}-backports ${components}
 EOF
+    # end debian #
 elif (( ubuntu )); then
+    components="main restricted universe multiverse"
+
     cat > "$sources_list" <<EOF
-deb ${mirror} ${suite} main restricted
-deb-src ${mirror} ${suite} main restricted
+deb ${mirror} ${suite} ${components}
+deb-src ${mirror} ${suite} ${components}
 
-deb ${mirror} ${suite}-security main restricted
-deb-src ${mirror} ${suite}-security main restricted
+deb ${mirror} ${suite}-security ${components}
+deb-src ${mirror} ${suite}-security ${components}
 
-deb ${mirror} ${suite}-updates main restricted
-deb-src ${mirror} ${suite}-updates main restricted
+deb ${mirror} ${suite}-updates ${components}
+deb-src ${mirror} ${suite}-updates ${components}
 EOF
+    # end ubuntu #
 fi
 
 ###
